@@ -40,7 +40,11 @@ export async function cancelarNaReceita(admin: SupabaseClient, d: PedidoCancelar
   } catch (e) {
     const corpo = e instanceof ErroTecnicoSefin ? e.corpo : undefined;
     console.error(JSON.stringify({ acao: "cancelamento", nota: d.notaId, erro: e instanceof Error ? e.message : String(e), corpo }));
-    return { ok: false, erro: `A Receita não respondeu. Tente de novo em alguns minutos. (${e instanceof Error ? e.message : e})`, corpoSefin: corpo };
+    const status = e instanceof ErroTecnicoSefin ? e.status : undefined;
+    const erro = status && status >= 500
+      ? `A Receita teve um erro interno ao processar o cancelamento (HTTP ${status}); a nota continua autorizada. Tente de novo mais tarde.`
+      : `A Receita não respondeu. Tente de novo em alguns minutos. (${e instanceof Error ? e.message : e})`;
+    return { ok: false, erro, corpoSefin: corpo };
   }
   if (resp.tipo === "rejeitado") return { ok: false, erro: `A Receita recusou o cancelamento: ${resp.mensagem}` };
 
