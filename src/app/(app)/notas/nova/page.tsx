@@ -1,4 +1,5 @@
 import { CampoMunicipio } from "@/components/campo-municipio";
+import { CamposServico } from "@/components/campos-servico";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
@@ -130,8 +131,7 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           <label>Número<input name="tomador_numero" defaultValue={v.tomador_numero} /></label>
           <label>Complemento<input name="tomador_complemento" defaultValue={v.tomador_complemento} /></label>
           <label>Bairro<input name="tomador_bairro" defaultValue={v.tomador_bairro} /></label>
-          <label>Cód. tributação nacional<input name="codigo_tributacao_nacional" defaultValue={v.codigo_tributacao_nacional} required pattern="\d{6}" /></label>
-          <label>NBS<input name="codigo_nbs" defaultValue={v.codigo_nbs} pattern="\d{9}" /></label>
+          <CamposServico codigo={v.codigo_tributacao_nacional} nbs={v.codigo_nbs} />
           <label>Município da prestação<CampoMunicipio name="cod_municipio_prestacao" codigo={v.cod_municipio_prestacao || munPadrao} required /></label>
           <label className="largo">Descrição do serviço<textarea name="descricao" defaultValue={v.descricao} required maxLength={2000} /></label>
           <label>Valor (R$)<input name="valor" defaultValue={v.valor?.replace(".", ",")} required inputMode="decimal" /></label>
