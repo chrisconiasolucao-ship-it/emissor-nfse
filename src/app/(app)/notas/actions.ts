@@ -8,15 +8,13 @@ import { auditar, ipDe, logSeguranca } from "@/lib/auditoria/audit";
 import { eEscritorio, exigir, podeCancelarOuSubstituir, podeEmitir } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
-import { abrirCertificadoDaEmpresa, portasSupabase } from "@/lib/fila/portas-supabase";
+import { abrirCertificadoDaEmpresa } from "@/lib/fila/portas-supabase";
 import { mensagemDuplicidade, parecidas, type NotaComparavel } from "@/lib/importacao/duplicidade";
 import { lerPlanilha, PlanilhaGrandeDemais, PlanilhaInvalida, sha256, type LinhaNota } from "@/lib/importacao/planilha";
 import { competenciaAtual, repetirMes } from "@/lib/importacao/repetir-mes";
 import { dinheiro, lerValor } from "@/lib/money";
-import { gerarDanfse } from "@/lib/nfse/danfse";
-import { montarPedidoCancelamento, type CodigoCancelamento } from "@/lib/nfse/evento-builder";
-import { SefinClient, agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
-import { assinarXml } from "@/lib/nfse/xml-signer";
+import { type CodigoCancelamento } from "@/lib/nfse/evento-builder";
+import { cancelarNaReceita } from "@/lib/fila/cancelamento";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
 
@@ -207,9 +205,8 @@ export async function cancelarNota(_: Estado, form: FormData): Promise<Estado> {
   if (!r.success) return { erro: r.error.issues.map((i) => i.message).join("; ") };
   const d = r.data;
   if (!podeCancelarOuSubstituir(perfil, d.empresa_id)) return { erro: "Só o escritório ou o administrador da empresa pode cancelar nota." };
-  const c = config();
   const db = await supabaseServidor();
-  const { data: nota } = await db.from("nota").select("chave_acesso, situacao, documento_id, empresa:empresa_id(cnpj)").eq("empresa_id", d.empresa_id).eq("id", d.id).single();
+  const { data: nota } = await db.from("nota").select("chave_acesso, situacao").eq("empresa_id", d.empresa_id).eq("id", d.id).single();
   if (!nota || nota.situacao !== "autorizada" || !nota.chave_acesso) return { erro: "Só nota autorizada pode ser cancelada." };
 
   const admin = supabaseAdmin();
@@ -217,49 +214,8 @@ export async function cancelarNota(_: Estado, form: FormData): Promise<Estado> {
   const cert = await abrirCertificadoDaEmpresa(admin, d.empresa_id);
   await logSeguranca(admin, { evento: "uso_certificado", usuarioId: perfil.usuarioId, email: perfil.email, ip, empresaId: d.empresa_id, alvo: d.id, detalhe: { acao: "cancelamento" } });
   await auditar(admin, { empresaId: d.empresa_id, acao: "uso_certificado", entidade: "nota", entidadeId: d.id, depois: { acao: "cancelamento", certificado_sha256: cert.aberto.sha256 }, quem: perfil.usuarioId, ip });
-  const cnpj = String((nota.empresa as unknown as { cnpj: string }).cnpj);
-  const pedido = montarPedidoCancelamento({ ambiente: c.NFSE_AMBIENTE, cnpjAutor: cnpj, chaveAcesso: nota.chave_acesso, codigoMotivo: d.codigo_motivo as CodigoCancelamento, motivo: d.motivo, em: new Date() });
-  const assinado = assinarXml(pedido.xml, "infPedReg", cert.aberto.chavePrivadaPem, cert.aberto.certificadoPem);
-  const sefin = new SefinClient(c.SEFIN_BASE_URL, transporteHttps(agenteMtls(cert.pfx, cert.senha)));
-  let resp;
-  try {
-    resp = await sefin.registrarEvento(nota.chave_acesso, assinado);
-  } catch (e) {
-    return { erro: `A Receita não respondeu. Tente de novo em alguns minutos. (${e instanceof Error ? e.message : e})` };
-  }
-  if (resp.tipo === "rejeitado") return { erro: `A Receita recusou o cancelamento: ${resp.mensagem}` };
-
-  const xml = Buffer.from(resp.eventoXml, "utf8");
-  const hash = sha256(xml);
-  const caminho = `${d.empresa_id}/notas/${d.id}/evento-cancelamento-${hash.slice(0, 12)}.xml`;
-  const up = await admin.storage.from("documentos").upload(caminho, xml, { contentType: "application/xml", upsert: false });
-  if (up.error && !/exists|duplicate/i.test(up.error.message)) return { erro: `Cancelado na Receita, mas o XML do evento não foi guardado: ${up.error.message}` };
-  const doc = await admin.from("documento").insert({ empresa_id: d.empresa_id, tipo: "xml_evento", storage_path: caminho, sha256: hash, tamanho: xml.length, content_type: "application/xml", nota_id: d.id, criado_por: perfil.usuarioId }).select("id").single();
-  const { error } = await admin.rpc("fn_registrar_evento", {
-    p_empresa_id: d.empresa_id,
-    p_nota_id: d.id,
-    p_tipo: "cancelamento",
-    p_codigo_motivo: d.codigo_motivo,
-    p_motivo: d.motivo,
-    p_quem: perfil.usuarioId,
-    p_protocolo: pedido.id,
-    p_documento_id: doc.data?.id ?? null,
-    p_nota_substituta_id: null,
-    p_ip: ip,
-  });
-  if (error) return { erro: `Cancelado na Receita, mas o sistema não registrou: ${error.message}. Avise o escritório.` };
-  // DANFSe com a marca CANCELADA (NT 008, item 2.5.1); se falhar, a nota continua cancelada e o PDF anterior fica
-  try {
-    const { data: xmlDoc } = await admin.from("documento").select("storage_path").eq("empresa_id", d.empresa_id).eq("id", nota.documento_id).single();
-    const arq = xmlDoc ? await admin.storage.from("documentos").download(String(xmlDoc.storage_path)) : null;
-    if (arq?.data) {
-      const portas = portasSupabase(admin, "cancelamento");
-      const pdf = await gerarDanfse(await arq.data.text(), { nomeMunicipio: portas.nomeMunicipio, situacao: "cancelada" });
-      await portas.guardarDocumento({ empresaId: d.empresa_id, id: d.id } as never, "danfse", pdf, "application/pdf");
-    }
-  } catch (e) {
-    console.error(JSON.stringify({ acao: "danfse_cancelada", nota: d.id, erro: e instanceof Error ? e.message : String(e) }));
-  }
+  const res = await cancelarNaReceita(admin, { empresaId: d.empresa_id, notaId: d.id, codigoMotivo: d.codigo_motivo as CodigoCancelamento, motivo: d.motivo, quem: perfil.usuarioId, ip });
+  if (!res.ok) return { erro: res.erro };
   revalidatePath(`/notas/${d.id}`);
   return { ok: true, mensagem: "Nota cancelada." };
 }

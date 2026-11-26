@@ -13,7 +13,7 @@ const ORIENTACAO: Record<string, string> = {
 };
 
 export class ErroTecnicoSefin extends Error {
-  constructor(public detalhe: string, public status?: number) {
+  constructor(public detalhe: string, public status?: number, public corpo?: string) {
     super(detalhe);
   }
 }

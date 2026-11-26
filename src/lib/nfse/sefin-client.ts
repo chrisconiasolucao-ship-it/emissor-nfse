@@ -47,6 +47,11 @@ export function transporteHttps(agent: https.Agent): Transporte {
     });
 }
 
+/** Começo do corpo da resposta (sem quebras), para log e diagnóstico. */
+export function trecho(r: RespostaHttp, max = 600): string {
+  return r.corpo.toString("utf8").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
 function json(r: RespostaHttp): Record<string, unknown> {
   try {
     return JSON.parse(r.corpo.toString("utf8")) as Record<string, unknown>;
@@ -88,7 +93,13 @@ export class SefinClient {
 
   private falhaTecnica(r: RespostaHttp): never {
     const c = classificar(r.status, json(r));
-    throw new ErroTecnicoSefin(`${c.mensagem} (${c.codigo})`, r.status);
+    throw new ErroTecnicoSefin(`${c.mensagem} (${c.codigo})`, r.status, trecho(r));
+  }
+
+  /** Manutenção: chamada crua (status e corpo), para diagnosticar respostas inesperadas da Sefin. */
+  async diagnosticar(metodo: "GET" | "POST", caminho: string, corpo?: object): Promise<{ status: number; contentType: string; corpo: string }> {
+    const r = await this.chamar(metodo, caminho, corpo);
+    return { status: r.status, contentType: r.contentType, corpo: r.corpo.toString("utf8").slice(0, 4000) };
   }
 
   /** Envia a DPS assinada. Falha técnica lança ErroTecnicoSefin; rejeição volta como resultado. */
