@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { CampoMunicipio } from "@/components/campo-municipio";
-import { EscolherCadastro } from "@/components/escolher-cadastro";
+import { PassosNota, type Escolhido } from "@/components/passos-nota";
 import { CamposServico } from "@/components/campos-servico";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
@@ -9,17 +8,19 @@ import { perfilAtual } from "@/lib/auth/sessao";
 import { competenciaAtual } from "@/lib/importacao/repetir-mes";
 import { lerNfse, type ModeloNota } from "@/lib/nfse/nfse-parser";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { reais } from "@/lib/money";
+import { codigoServico, documento } from "@/lib/formato";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { salvarNota } from "../actions";
 
 type Valores = Partial<Record<string, string>>;
 
 /** Nota avulsa, a partir de nota anterior (?modelo=<nota>), de XML importado (?documento=<doc>) ou substituição (?substitui=<nota>). */
-export default async function NovaNota({ searchParams }: { searchParams: Promise<{ empresa?: string; modelo?: string; documento?: string; substitui?: string; editar?: string; tomador?: string; servico?: string }> }) {
+export default async function NovaNota({ searchParams }: { searchParams: Promise<{ empresa?: string; modelo?: string; documento?: string; substitui?: string; editar?: string; tomador?: string; servico?: string; tdoc?: string; tnome?: string; scod?: string; sdesc?: string }> }) {
   const perfil = await perfilAtual();
   const p = await searchParams;
   const db = await supabaseServidor();
-  const { data: empresas } = await db.from("empresa").select("id, razao_social, cod_municipio").eq("ativa", true).order("razao_social");
+  const { data: empresas } = await db.from("empresa").select("id, razao_social, cnpj, regime, cod_municipio").eq("ativa", true).order("razao_social");
   const empresaPadrao = p.empresa ?? (eEscritorio(perfil) ? undefined : (perfil.empresaId ?? undefined));
   let v: Valores = { competencia: competenciaAtual().slice(0, 7) };
   let retido = false;
@@ -97,10 +98,14 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
     }
   }
   // cadastros salvos escolhidos no topo da tela (?tomador=<id>&servico=<id>) preenchem por cima
-  let rotuloTomador: string | undefined;
-  let rotuloServico: string | undefined;
+  let tomadorEsc: Escolhido = null;
+  let servicoEsc: Escolhido = null;
   let servicoId: string | undefined;
-  if (p.tomador && p.empresa) {
+  if (p.tomador === "novo" && p.empresa) {
+    const doc = (p.tdoc ?? "").replace(/\D/g, "");
+    v = { ...v, empresa_id: p.empresa, tomador_tipo: doc.length === 14 ? "CNPJ" : "CPF", tomador_documento: doc, tomador_nome: p.tnome ?? "" };
+    tomadorEsc = { titulo: "Novo tomador", detalhe: "Preencha os dados abaixo. Ele fica salvo nos cadastros da empresa ao emitir.", novo: true };
+  } else if (p.tomador && p.empresa) {
     const { data: t } = await db.from("tomador").select("*").eq("empresa_id", p.empresa).eq("id", p.tomador).maybeSingle();
     if (t) {
       v = {
@@ -117,10 +122,13 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
         tomador_complemento: t.complemento ?? "",
         tomador_bairro: t.bairro ?? "",
       };
-      rotuloTomador = `${t.nome} · ${t.tipo_documento} ${t.documento}`;
+      tomadorEsc = { titulo: t.nome, detalhe: `${t.tipo_documento} ${documento(t.documento)}`, origem: t.origem ?? undefined };
     }
   }
-  if (p.servico && p.empresa) {
+  if (p.servico === "novo" && p.empresa) {
+    v = { ...v, empresa_id: p.empresa, codigo_tributacao_nacional: p.scod ?? "", descricao: p.sdesc ?? "" };
+    servicoEsc = { titulo: "Novo serviço", detalhe: "Informe o código de tributação e a descrição abaixo. Ele fica salvo nos serviços da empresa.", novo: true };
+  } else if (p.servico && p.empresa) {
     const { data: sv } = await db.from("servico").select("*").eq("empresa_id", p.empresa).eq("id", p.servico).maybeSingle();
     if (sv) {
       v = {
@@ -135,24 +143,45 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
       };
       retido = Boolean(sv.iss_retido);
       servicoId = String(sv.id);
-      rotuloServico = `${sv.nome ? `${sv.nome} · ` : ""}${sv.codigo_tributacao_nacional} · ${String(sv.descricao).slice(0, 70)}`;
+      const cod = String(sv.codigo_tributacao_nacional ?? "");
+      servicoEsc = { titulo: sv.nome || String(sv.descricao).slice(0, 80), codigo: codigoServico(cod), detalhe: sv.valor_padrao != null ? `valor padrão ${reais(sv.valor_padrao)}` : "sem valor padrão, informe o valor", origem: sv.origem ?? undefined };
     }
   }
-  const empresaId = v.empresa_id ?? empresaPadrao;
-  const munPadrao = (empresas ?? []).find((e) => e.id === empresaId)?.cod_municipio ?? "";
+  const unica = !eEscritorio(perfil) && (empresas ?? []).length === 1 ? empresas![0]!.id : undefined;
+  const empresaId = v.empresa_id ?? empresaPadrao ?? unica;
+  const emp = (empresas ?? []).find((e) => e.id === empresaId);
+  const munPadrao = emp?.cod_municipio ?? "";
+  const travado = Boolean(deNota || p.documento);
+  if (travado && v.tomador_nome) tomadorEsc = { titulo: v.tomador_nome, detalhe: `${v.tomador_tipo} ${documento(v.tomador_documento)}` };
+  if (travado && v.descricao) servicoEsc = { titulo: v.descricao.slice(0, 80), codigo: codigoServico(v.codigo_tributacao_nacional) };
+  // o formulário aparece quando os três passos estão resolvidos (ou quando a nota vem de outra)
+  const pronto = Boolean(emp && (travado || (tomadorEsc && servicoEsc)));
+  const falta = !emp ? "a empresa" : !tomadorEsc && !servicoEsc ? "o tomador e o serviço" : !tomadorEsc ? "o tomador" : "o serviço";
 
   return (
     <>
-      <h1>{titulo}</h1>
-      {!v.id && !p.substitui && (
-        <div className="cartao">
-          <p className="suave">Preencha mais rápido com um cadastro salvo da empresa (veja e edite em <Link href={`/cadastros${empresaId ? `?empresa=${empresaId}` : ""}`}>Cadastros</Link>).</p>
-          <Suspense>
-            <EscolherCadastro empresaPadrao={empresaId} tomador={rotuloTomador} servico={rotuloServico} />
-          </Suspense>
+      <div className="cab">
+        <div>
+          <h1>{titulo}</h1>
+          <p>{travado ? "Os dados vêm da nota de origem. Confira e ajuste antes de emitir." : "Escolha a empresa, depois o tomador e o serviço. Clique na lista ou digite para buscar."}</p>
         </div>
-      )}
-      <div className="cartao">
+      </div>
+      <div className="duas">
+        <div className="pilha">
+          <Suspense>
+            <PassosNota
+              empresas={(empresas ?? []).map((e) => ({ id: e.id, titulo: e.razao_social, detalhe: `CNPJ ${documento(e.cnpj)} · ${e.regime}` }))}
+              empresaId={emp?.id}
+              empresa={emp ? { titulo: emp.razao_social, detalhe: `CNPJ ${documento(emp.cnpj)} · ${emp.regime}` } : null}
+              tomador={tomadorEsc}
+              servico={servicoEsc}
+              trocarEmpresa={eEscritorio(perfil) || (empresas ?? []).length > 1}
+              travado={travado}
+            />
+          </Suspense>
+          {pronto && (
+      <section className="cartao" aria-labelledby="t-dados">
+        <div className="cartao-cab"><h2 id="t-dados" style={{ margin: 0 }}>Dados da nota</h2><span className="suave">Tudo pode ser ajustado antes de emitir.</span></div>
         <Formulario
           key={JSON.stringify(p)}
           acao={salvarNota}
@@ -167,12 +196,7 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           {v.id && <input type="hidden" name="id" value={v.id} />}
           <input type="hidden" name="origem" value={origem} />
           {v.documento_origem_id && <input type="hidden" name="documento_origem_id" value={v.documento_origem_id} />}
-          <label className="largo">Empresa (prestador)
-            <select name="empresa_id" defaultValue={empresaId ?? ""} required>
-              <option value="" disabled>Escolha</option>
-              {(empresas ?? []).map((e) => <option key={e.id} value={e.id}>{e.razao_social}</option>)}
-            </select>
-          </label>
+          <input type="hidden" name="empresa_id" value={emp?.id ?? ""} />
           <label>Tomador
             <select name="tomador_tipo" defaultValue={v.tomador_tipo ?? "CPF"}><option value="CPF">CPF</option><option value="CNPJ">CNPJ</option></select>
           </label>
@@ -214,6 +238,19 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
             </>
           )}
         </Formulario>
+      </section>
+          )}
+        </div>
+        <aside className="cartao resumo" aria-labelledby="t-resumo">
+          <h2 id="t-resumo" style={{ margin: 0 }}>Resumo</h2>
+          <div className="total">{v.valor ? reais(v.valor) : "R$ 0,00"}</div>
+          <div className="linha"><span className="suave">Empresa</span><span>{emp?.razao_social ?? "—"}</span></div>
+          <div className="linha"><span className="suave">Tomador</span><span>{tomadorEsc?.novo ? "novo" : (tomadorEsc?.titulo ?? "—")}</span></div>
+          <div className="linha"><span className="suave">Serviço</span><span>{servicoEsc?.novo ? "novo" : (servicoEsc?.codigo || servicoEsc?.titulo || "—")}</span></div>
+          <div className="linha"><span className="suave">ISS</span><span>{retido ? "retido pelo tomador" : "no DAS"}</span></div>
+          <p className="msg alerta" style={{ margin: 0, fontSize: 13 }} hidden={pronto}>Falta escolher {falta}.</p>
+          <p className="suave" style={{ margin: 0 }} hidden={!pronto}>Os botões Emitir e Salvar rascunho ficam no fim do formulário.</p>
+        </aside>
       </div>
     </>
   );

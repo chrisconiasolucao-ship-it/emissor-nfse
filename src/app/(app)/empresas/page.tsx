@@ -6,6 +6,7 @@ import { supabaseServidor } from "@/lib/supabase/server";
 import { salvarEmpresa } from "./actions";
 import { CadastroPeloCertificado } from "./cadastro-certificado";
 import { CampoMunicipio } from "@/components/campo-municipio";
+import { documento } from "@/lib/formato";
 
 export default async function Empresas() {
   const perfil = await perfilAtual();
@@ -14,19 +15,19 @@ export default async function Empresas() {
   return (
     <>
       <h1>Empresas</h1>
-      <div className="tabela">
-        <table>
-          <thead><tr><th>Razão social</th><th>CNPJ</th><th>Regime</th><th>Situação</th></tr></thead>
-          <tbody>
-            {(data ?? []).map((e) => (
-              <tr key={e.id}>
-                <td><Link href={`/empresas/${e.id}`}>{e.razao_social}</Link></td>
-                <td>{e.cnpj}</td><td>{e.regime}</td>
-                <td>{!e.ativa ? "inativa" : e.pausada ? "pausada" : "ativa"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="empresas">
+        {(data ?? []).map((e) => (
+          <Link key={e.id} href={`/empresas/${e.id}`} className="cartao empresa" style={{ color: "inherit", textDecoration: "none" }}>
+            <div className="empresa-topo">
+              <span className="sigla" aria-hidden="true">{String(e.razao_social).split(/\s+/).filter((p: string) => p.length > 2).slice(0, 2).map((p: string) => p[0]!.toUpperCase()).join("")}</span>
+              <div><strong>{e.razao_social}</strong><span className="suave">{documento(e.cnpj)} · {e.regime}</span></div>
+            </div>
+            <div className="empresa-pe">
+              <span className={`selo ${!e.ativa ? "cancelada" : e.pausada ? "na_fila" : "autorizada"}`}>{!e.ativa ? "Inativa" : e.pausada ? "Pausada" : "Ativa"}</span>
+              <span className="suave">Ver cadastro, certificado e usuários</span>
+            </div>
+          </Link>
+        ))}
       </div>
       {eEscritorio(perfil) && (
         <>
