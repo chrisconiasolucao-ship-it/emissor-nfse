@@ -31,7 +31,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "não autorizado" }, { status: 401 });
   }
   if (c.NFSE_AMBIENTE !== "restrita") return NextResponse.json({ erro: "só na produção restrita" }, { status: 400 });
-  const r = entrada.safeParse(await req.json().catch(() => ({})));
+  // parâmetros pela URL (o chamar_worker do banco manda corpo vazio) ou pelo corpo JSON
+  const r = entrada.safeParse({ ...Object.fromEntries(new URL(req.url).searchParams), ...(await req.json().catch(() => ({}))) });
   if (!r.success) return NextResponse.json({ erro: r.error.issues.map((i) => i.message).join("; ") }, { status: 400 });
   const d = r.data;
   const admin = supabaseAdmin();
