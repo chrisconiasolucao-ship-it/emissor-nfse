@@ -5,7 +5,7 @@ import { gerarDanfse } from "@/lib/nfse/danfse";
 import { ErroTecnicoSefin } from "@/lib/nfse/erros-sefin";
 import { montarPedidoCancelamento, type CodigoCancelamento } from "@/lib/nfse/evento-builder";
 import { SefinClient, agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
-import { assinarXml } from "@/lib/nfse/xml-signer";
+import { assinarXml, type OpcoesAssinatura } from "@/lib/nfse/xml-signer";
 import { abrirCertificadoDaEmpresa, portasSupabase } from "./portas-supabase";
 
 export type PedidoCancelar = {
@@ -15,6 +15,8 @@ export type PedidoCancelar = {
   motivo: string;
   quem: string;
   ip: string | null;
+  /** Só para conferência na produção restrita (worker de eventos); a tela usa o padrão. */
+  variante?: { versao?: "1.00" | "1.01" } & OpcoesAssinatura;
 };
 export type ResultadoCancelar = { ok: true } | { ok: false; erro: string; corpoSefin?: string };
 
@@ -29,8 +31,8 @@ export async function cancelarNaReceita(admin: SupabaseClient, d: PedidoCancelar
   if (!nota || nota.situacao !== "autorizada" || !nota.chave_acesso) return { ok: false, erro: "Só nota autorizada pode ser cancelada." };
   const cert = await abrirCertificadoDaEmpresa(admin, d.empresaId);
   const cnpj = String((nota.empresa as unknown as { cnpj: string }).cnpj);
-  const pedido = montarPedidoCancelamento({ ambiente: c.NFSE_AMBIENTE, cnpjAutor: cnpj, chaveAcesso: nota.chave_acesso, codigoMotivo: d.codigoMotivo, motivo: d.motivo, em: new Date() });
-  const assinado = assinarXml(pedido.xml, "infPedReg", cert.aberto.chavePrivadaPem, cert.aberto.certificadoPem);
+  const pedido = montarPedidoCancelamento({ ambiente: c.NFSE_AMBIENTE, cnpjAutor: cnpj, chaveAcesso: nota.chave_acesso, codigoMotivo: d.codigoMotivo, motivo: d.motivo, em: new Date(), versao: d.variante?.versao });
+  const assinado = assinarXml(pedido.xml, "infPedReg", cert.aberto.chavePrivadaPem, cert.aberto.certificadoPem, d.variante);
   const sefin = new SefinClient(c.SEFIN_BASE_URL, transporteHttps(agenteMtls(cert.pfx, cert.senha)));
   let resp;
   try {

@@ -16,6 +16,7 @@ export function montarPedidoCancelamento(a: {
   codigoMotivo: CodigoCancelamento;
   motivo: string;
   em: Date;
+  versao?: "1.00" | "1.01";
 }): { xml: string; id: string } {
   if (!/^\d{50}$/.test(a.chaveAcesso)) throw new Error("chave de acesso inválida");
   const motivo = a.motivo.trim();
@@ -29,7 +30,7 @@ export function montarPedidoCancelamento(a: {
     el("chNFSe", a.chaveAcesso) +
     grupo("e101101", el("xDesc", "Cancelamento de NFS-e") + el("cMotivo", a.codigoMotivo) + el("xMotivo", motivo));
   return {
-    xml: `<pedRegEvento xmlns="${NS_NFSE}" versao="${VERSAO_DPS}"><infPedReg Id="${esc(id)}">${inf}</infPedReg></pedRegEvento>`,
+    xml: `<pedRegEvento xmlns="${NS_NFSE}" versao="${a.versao ?? VERSAO_DPS}"><infPedReg Id="${esc(id)}">${inf}</infPedReg></pedRegEvento>`,
     id,
   };
 }

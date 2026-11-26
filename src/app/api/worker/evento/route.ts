@@ -18,6 +18,9 @@ const entrada = z.object({
   quem: z.uuid().optional(),
   codigo_motivo: z.enum(["1", "2", "9"]).optional(),
   motivo: z.string().trim().min(15).max(255).optional(),
+  versao: z.enum(["1.00", "1.01"]).optional(),
+  hash: z.enum(["sha256", "sha1"]).optional(),
+  c14n: z.enum(["exc", "inc"]).optional(),
 });
 
 /**
@@ -53,6 +56,6 @@ export async function POST(req: Request) {
 
   if (!d.quem || !d.codigo_motivo || !d.motivo) return NextResponse.json({ erro: "cancelar exige quem, codigo_motivo e motivo" }, { status: 400 });
   await auditar(admin, { empresaId, acao: "uso_certificado", entidade: "nota", entidadeId: d.nota, depois: { acao: "cancelamento", certificado_sha256: cert.aberto.sha256 }, quem: d.quem, ip: null });
-  const res = await cancelarNaReceita(admin, { empresaId, notaId: d.nota, codigoMotivo: d.codigo_motivo, motivo: d.motivo, quem: d.quem, ip: null });
+  const res = await cancelarNaReceita(admin, { empresaId, notaId: d.nota, codigoMotivo: d.codigo_motivo, motivo: d.motivo, quem: d.quem, ip: null, variante: { versao: d.versao, hash: d.hash, c14n: d.c14n } });
   return NextResponse.json(res);
 }
