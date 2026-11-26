@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { AdnClient, FIM_DA_FILA } from "@/lib/nfse/adn-client";
 import { ErroTecnicoSefin } from "@/lib/nfse/erros-sefin";
 import type { RespostaHttp, Transporte } from "@/lib/nfse/sefin-client";
-import { gzipB64 } from "@/lib/nfse/xml";
+import { gzipSync } from "node:zlib";
+
+// o ADN devolve o XML compactado como veio; aqui sem declaração, para conferir que nada é acrescentado na leitura
+const gzipB64 = (xml: string) => gzipSync(Buffer.from(xml, "utf8")).toString("base64");
 
 const resp = (status: number, body: unknown): RespostaHttp => ({ status, corpo: Buffer.from(JSON.stringify(body)), contentType: "application/json" });
 
