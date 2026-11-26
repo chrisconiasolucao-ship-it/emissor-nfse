@@ -41,11 +41,11 @@ Feito pelo próprio escritório para a sua carteira: um único sistema onde o co
 
 ## Brand Commitments
 
-Nenhum compromisso de marca. Não é preciso exibir logo ou cores da CHRISCON para os clientes; o nome "CHRISCON · NFS-e" aparece hoje no cabeçalho.
+Usar a paleta do logo "CHRISCON I.A" (decisão do José, 26/11/2026): azul vivo da seta (~#1565D8, variando até ~#0B4FB3) para ações e seleção, e grafite azulado (~#1E252C a ~#2B3441) para o menu e áreas de destaque, sobre fundo claro. O símbolo do logo (seta e barras) pode aparecer no menu. Códigos exatos de cor podem vir do José depois; quando vierem, eles valem.
 
 ## Evidence on Hand
 
-- Exemplos de layout em 3 estilos (A clara, B menu lateral, C cartões grandes): `/mnt/project-files/visual-cards/exemplos-visual.html`. José escolheu misturar os três.
+- Exemplos de layout em 3 estilos (A clara, B menu lateral, C cartões grandes): `/mnt/project-files/visual-cards/exemplos-visual.html`. José não aprovou A–E; pediu as cores da marca. Direções F (marca clara) e G (marca escura) no mesmo arquivo.
 - Especificação SDD do emissor (brainstorm, define, design) fora do repositório, na pasta do projeto.
 - Não há depoimentos, clientes citáveis ou números públicos; não inventar.
 
