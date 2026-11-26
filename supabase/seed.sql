@@ -11,13 +11,13 @@ insert into public.municipio_situacao (cod_ibge, nome, uf, conveniado, ativo_ope
 values
   ('4301602', 'Bagé', 'RS', true, true, false),
   ('4314902', 'Porto Alegre', 'RS', true, true, false),
-  ('3521408', 'Iperó', 'SP', true, true, true)
+  ('3521002', 'Iperó', 'SP', true, true, true)
 on conflict (cod_ibge) do nothing;
 
 insert into public.tomador (empresa_id, id, tipo_documento, documento, nome, cod_municipio)
 values
   ('00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-0000000000a1', 'CPF', '52998224725', 'TOMADOR PF DA EMPRESA A', '4301602'),
-  ('00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-0000000000b1', 'CNPJ', '11444777000161', 'TOMADOR PJ DA EMPRESA B', '3521408')
+  ('00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-0000000000b1', 'CNPJ', '11444777000161', 'TOMADOR PJ DA EMPRESA B', '3521002')
 on conflict do nothing;
 
 insert into public.servico (empresa_id, id, codigo_tributacao_nacional, codigo_nbs, descricao, aliquota_iss)

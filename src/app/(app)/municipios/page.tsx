@@ -17,9 +17,9 @@ async function importarMunicipios(_: Estado, form: FormData): Promise<Estado> {
   const arquivo = form.get("arquivo");
   if (!(arquivo instanceof File) || arquivo.size === 0 || arquivo.size > 10 * 1024 * 1024) return { erro: "Escolha o arquivo exportado do painel (até 10 MB)." };
   const buf = Buffer.from(await arquivo.arrayBuffer());
-  let lidos;
+  let lidos, semCodigo: string[];
   try {
-    lidos = await lerMunicipios(buf, arquivo.name);
+    ({ lidos, semCodigo } = await lerMunicipios(buf, arquivo.name));
   } catch (e) {
     return { erro: e instanceof Error ? e.message : String(e) };
   }
@@ -31,9 +31,11 @@ async function importarMunicipios(_: Estado, form: FormData): Promise<Estado> {
     );
     if (error) return { erro: error.message };
   }
-  await auditar(supabaseAdmin(), { empresaId: null, acao: "importar_municipios", entidade: "municipio_situacao", entidadeId: null, depois: { arquivo: arquivo.name, sha256: sha256(buf), municipios: lidos.length }, quem: perfil.usuarioId });
+  await auditar(supabaseAdmin(), { empresaId: null, acao: "importar_municipios", entidade: "municipio_situacao", entidadeId: null, depois: { arquivo: arquivo.name, sha256: sha256(buf), municipios: lidos.length, sem_codigo_ibge: semCodigo }, quem: perfil.usuarioId });
   revalidatePath("/municipios");
-  return { ok: true, mensagem: `${lidos.length} municípios atualizados.` };
+  const aviso = semCodigo.length === 0 ? "" :
+    ` ${semCodigo.length} não encontrados na lista do IBGE e não importados: ${semCodigo.slice(0, 10).join(", ")}${semCodigo.length > 10 ? ` e mais ${semCodigo.length - 10}` : ""}.`;
+  return { ok: true, mensagem: `${lidos.length} municípios atualizados.${aviso}` };
 }
 
 export default async function Municipios({ searchParams }: { searchParams: Promise<{ busca?: string }> }) {

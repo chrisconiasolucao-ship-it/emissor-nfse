@@ -1,0 +1,5 @@
+Regiao;UF;NomeMunicipio;CNPJ;StatusConvenioSEFIN;AderenteAmbienteNacional;AderenteEmissorNacional;AderenteMAN;AtivoNaBase;AtivoUltimoPeriodo;Populacao;Situação;Publicação;Início de Vigência;Data última atualização;Hora última atualização
+Sul;RS;BAGE;88073291000199;Conveniado Ativo;Sim;Não;Não;Sim;Sim;121.900;Ativo;28/12/2023;18/09/2024;17/09/24;11:40
+Sudeste;SP;IPERO;00000000000000;Conveniado - Nao Ativo;Sim;Sim;Não;Sim;Sim;1;Cadastrado;01/01/2025;01/01/2026;01/01/26;00:01
+Sul;PR;MUNHOZ DE MELLO;00000000000000;Conveniado Ativo;Sim;Sim;Não;Sim;Sim;1;Ativo;01/01/2025;01/01/2026;01/01/26;00:01
+Norte;PA;CIDADE INEXISTENTE;00000000000000;Conveniado Ativo;Sim;Sim;Não;Sim;Sim;1;Ativo;01/01/2025;01/01/2026;01/01/26;00:01

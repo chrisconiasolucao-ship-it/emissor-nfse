@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { avaliarRegraMunicipio, type SituacaoMunicipio } from "@/lib/nfse/regra-municipio";
 
-const ipero: SituacaoMunicipio = { codIbge: "3521408", nome: "Iperó", uf: "SP", ativoOperacional: true, emissorNacional: false };
+const ipero: SituacaoMunicipio = { codIbge: "3521002", nome: "Iperó", uf: "SP", ativoOperacional: true, emissorNacional: false };
 const bage: SituacaoMunicipio = { codIbge: "4301602", nome: "Bagé", uf: "RS", ativoOperacional: true, emissorNacional: true };
 
 describe("regra de município (AT-001 a AT-003)", () => {
