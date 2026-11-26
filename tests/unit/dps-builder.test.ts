@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { montarDps, type DadosDps } from "@/lib/nfse/dps-builder";
 import { montarIdDps } from "@/lib/nfse/dps-id";
 
-const XSD = resolve(__dirname, "../fixtures/xsd/DPS_v1.00.xsd");
+const XSD = resolve(__dirname, "../fixtures/xsd-v1.01/DPS_v1.01.xsd");
 
 function validarXsd(xml: string): { ok: boolean; saida: string } {
   const dir = mkdtempSync(join(tmpdir(), "dps-"));

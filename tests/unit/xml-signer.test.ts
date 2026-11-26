@@ -1,5 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { abrirPfx } from "@/lib/crypto/pfx";
 import { montarDps } from "@/lib/nfse/dps-builder";
@@ -27,6 +29,15 @@ describe("assinatura XMLDSig (AT-004)", () => {
     expect(assinado).toMatch(/<Reference URI="#DPS\d{42}"/);
     expect(assinaturaValida(assinado, cert.certificadoPem)).toBe(true);
   });
+  it("DPS assinada (com a declaração UTF-8) é válida no esquema v1.01 da produção restrita", () => {
+    const assinado = '<?xml version="1.0" encoding="UTF-8"?>' + assinarXml(xml, "infDPS", cert.chavePrivadaPem, cert.certificadoPem);
+    const arq = join(mkdtempSync(join(tmpdir(), "dpsass-")), "d.xml");
+    writeFileSync(arq, assinado);
+    let erro = "";
+    try { execFileSync("xmllint", ["--noout", "--schema", resolve(__dirname, "../fixtures/xsd-v1.01/DPS_v1.01.xsd"), arq], { stdio: "pipe" }); }
+    catch (e) { erro = (e as { stderr?: Buffer }).stderr?.toString() ?? String(e); }
+    expect(erro).toBe("");
+  });
   it("qualquer alteração depois de assinar invalida a assinatura", () => {
     const assinado = assinarXml(xml, "infDPS", cert.chavePrivadaPem, cert.certificadoPem);
     expect(assinaturaValida(assinado.replace("<vServ>10.00</vServ>", "<vServ>99.00</vServ>"), cert.certificadoPem)).toBe(false);
@@ -40,7 +51,7 @@ describe("assinatura XMLDSig (AT-004)", () => {
       motivo: "Erro na emissão do valor",
       em: new Date("2026-11-11T12:00:00Z"),
     });
-    expect(p.id).toBe("PRE" + "4".repeat(50) + "101101001");
+    expect(p.id).toBe("PRE" + "4".repeat(50) + "101101");
     const assinado = assinarXml(p.xml, "infPedReg", cert.chavePrivadaPem, cert.certificadoPem);
     expect(assinaturaValida(assinado, cert.certificadoPem)).toBe(true);
   });

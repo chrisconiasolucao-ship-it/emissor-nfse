@@ -3,13 +3,13 @@ import { montarIdDps } from "./dps-id";
 import { dataHoraBrasilia, el, esc, grupo } from "./xml";
 
 /**
- * Monta o XML da DPS v1.00 (sem o grupo IBS/CBS, fora de escopo até 01/01/2027).
+ * Monta o XML da DPS v1.01 (esquema da produção restrita de 24/11/2026; sem o grupo IBS/CBS, opcional no esquema).
  * Regras aplicadas para emitente = prestador (tpEmit 1): nome e endereço do prestador não são
  * informados (vêm do cadastro nacional). Pontos marcados "validar na restrita" dependem das regras
  * de negócio da Sefin, que os XSDs não mostram.
  */
 export const NS_NFSE = "http://www.sped.fazenda.gov.br/nfse";
-export const VERSAO_DPS = "1.00";
+export const VERSAO_DPS = "1.01";
 export const VER_APLIC = "CHRISCON-1.0";
 
 export type DadosDps = {
@@ -107,6 +107,7 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
     el("nDPS", BigInt(d.numero).toString()) +
     el("dCompet", d.competencia) +
     el("tpEmit", "1") +
+    el("finNFSe", "0") + // NFS-e regular (v1.01, reforma tributária)
     el("cLocEmi", d.prestador.codMunicipio) +
     subst +
     grupo(
@@ -125,12 +126,13 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
         el("fone", t.telefone ? so(t.telefone) : null) +
         el("email", t.email),
     ) +
+    el("indDest", "0") + // destinatário = o próprio tomador (v1.01)
     grupo(
       "serv",
       grupo("locPrest", el("cLocPrestacao", d.servico.codMunicipioPrestacao)) +
         grupo(
           "cServ",
-          el("cTribNac", d.servico.codigoTributacaoNacional) + el("xDescServ", d.servico.descricao) + el("cNBS", d.servico.codigoNbs),
+          el("cTribNac", d.servico.codigoTributacaoNacional) + el("cNBS", d.servico.codigoNbs) + el("xDescServ", d.servico.descricao),
         ),
     ) +
     grupo(
