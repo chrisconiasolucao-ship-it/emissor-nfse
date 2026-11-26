@@ -365,5 +365,6 @@ export async function buscarNoAdn(_: Estado, form: FormData): Promise<Estado> {
   const e = j.empresas?.[0];
   if (!e) return { erro: "A busca não retornou resultado." };
   if (e.erro) return { erro: `Falha na busca: ${e.erro}` };
+  if (!e.novos && !e.repetidos) return { ok: true, mensagem: "Nenhuma nota nova encontrada no ADN para esta empresa." };
   return { ok: true, mensagem: `${e.novos ?? 0} nota(s) nova(s) do ADN; ${e.repetidos ?? 0} já estavam guardadas.` };
 }

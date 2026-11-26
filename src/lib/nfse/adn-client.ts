@@ -4,10 +4,13 @@ import { gunzipB64 } from "./xml";
 
 /**
  * Distribuição ADN (AT-021): GET /DFe/{NSU}?cnpjConsulta={cnpj}&lote=true.
- * Sem os dois parâmetros a API devolve 400 genérico. E2230 "Nenhum documento localizado" = fim normal.
+ * Sem os dois parâmetros a API devolve 400 genérico. E2230 (e E2220, visto na produção restrita em 26/11/2026)
+ * "Nenhum documento localizado" = fim normal, não é erro.
  * Um NSU por CNPJ. XML vem GZip + Base64.
  */
 export const FIM_DA_FILA = "E2230";
+export const CODIGOS_FIM_DA_FILA = new Set([FIM_DA_FILA, "E2220"]);
+const nenhumDocumento = (d: unknown) => /nenhum documento localizado/i.test(String(d ?? ""));
 
 export type DocumentoAdn = { nsu: bigint; chaveAcesso: string | null; tipo: string; xml: string };
 export type PaginaAdn = { documentos: DocumentoAdn[]; fim: boolean; ultimoNsu: bigint };
@@ -39,7 +42,7 @@ export class AdnClient {
       /* corpo vazio */
     }
     const erros = (obter(body, "Erros") as Record<string, unknown>[] | undefined) ?? [];
-    if (erros.some((e) => String(obter(e, "Codigo")) === FIM_DA_FILA)) {
+    if (erros.some((e) => CODIGOS_FIM_DA_FILA.has(String(obter(e, "Codigo"))) || (r.status === 404 && nenhumDocumento(obter(e, "Descricao"))))) {
       return { documentos: [], fim: true, ultimoNsu: nsu };
     }
     if (r.status >= 500 || r.status === 429 || r.status === 0) throw new ErroTecnicoSefin(`ADN indisponível (HTTP ${r.status})`, r.status);

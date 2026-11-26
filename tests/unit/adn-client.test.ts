@@ -26,6 +26,14 @@ describe("AdnClient (AT-021)", () => {
     expect(urls[0]).toBe("https://adn.exemplo/DFe/0?cnpjConsulta=11222333000181&lote=true");
     expect(urls[1]).toContain("/DFe/2?");
   });
+  it("E2220 \"Nenhum documento localizado\" (produção restrita) também é fim normal, não erro", async () => {
+    const c = new AdnClient("https://adn.exemplo", async () => resp(404, { Erros: [{ Codigo: "E2220", Descricao: "Nenhum documento localizado." }] }));
+    await expect(c.pagina("11222333000181", 0n)).resolves.toMatchObject({ documentos: [], fim: true, ultimoNsu: 0n });
+  });
+  it("outro 4xx continua sendo recusa", async () => {
+    const c = new AdnClient("https://adn.exemplo", async () => resp(400, { Erros: [{ Codigo: "E9999", Descricao: "outra coisa" }] }));
+    await expect(c.pagina("11222333000181", 0n)).rejects.toThrow(/E9999/);
+  });
   it("5xx é falha técnica", async () => {
     const c = new AdnClient("https://adn.exemplo", async () => resp(503, {}));
     await expect(c.pagina("11222333000181", 0n)).rejects.toBeInstanceOf(ErroTecnicoSefin);
