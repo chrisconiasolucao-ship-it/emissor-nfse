@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { ComboBusca } from "@/components/combo-busca";
 import { buscarCodigosTributacao, descricaoCodigo, nbsDoCodigo, type Opcao } from "@/app/(app)/notas/catalogo-actions";
 
 const rotulo = (o: Opcao) => `${o.codigo} — ${o.descricao}`;
@@ -10,7 +11,6 @@ const rotulo = (o: Opcao) => `${o.codigo} — ${o.descricao}`;
  * código escolhido, pela correlação item × NBS; com uma só, já vem marcada).
  */
 export function CamposServico({ codigo, nbs }: { codigo?: string; nbs?: string }) {
-  const lista = useId();
   const [texto, setTexto] = useState(codigo ?? "");
   const [cod, setCod] = useState(codigo ?? "");
   const [opcoes, setOpcoes] = useState<Opcao[]>([]);
@@ -50,9 +50,11 @@ export function CamposServico({ codigo, nbs }: { codigo?: string; nbs?: string }
   return (
     <>
       <label className="largo">Código de tributação nacional
-        <input list={lista} value={texto} onChange={(e) => void digitar(e.target.value)} required autoComplete="off"
-          placeholder="Digite o código ou parte da descrição, ex.: contabilidade" aria-invalid={Boolean(texto) && !cod} />
-        <datalist id={lista}>{opcoes.map((o) => <option key={o.codigo} value={rotulo(o)} />)}</datalist>
+        <ComboBusca texto={texto} required invalido={Boolean(texto) && !cod}
+          placeholder="Digite o código ou parte da descrição, ex.: contabilidade"
+          opcoes={opcoes.map((o) => ({ valor: o.codigo, rotulo: rotulo(o) }))}
+          onDigitar={(v) => void digitar(v)}
+          onEscolher={(o) => { ++ultimo.current; setTexto(o.rotulo); if (o.valor !== cod) { setCod(o.valor); void carregarNbs(o.valor); } }} />
         <input type="hidden" name="codigo_tributacao_nacional" value={cod} />
         {texto && !cod && <span className="suave">Escolha um código da lista.</span>}
       </label>

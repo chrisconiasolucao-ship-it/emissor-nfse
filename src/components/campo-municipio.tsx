@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buscarMunicipios, type OpcaoMunicipio } from "@/app/(app)/municipios/actions";
+import { ComboBusca } from "@/components/combo-busca";
 
 const rotulo = (m: OpcaoMunicipio) => `${m.nome}/${m.uf}`;
+const normal = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
 
 /**
  * Município pelo nome (ex.: "Bagé/RS"); o código IBGE vai num campo escondido com o `name` informado.
- * Lista vem da situação dos municípios importada da Receita.
+ * Lista vem da situação dos municípios importada da Receita. Clicar na lista escolhe; digitar o nome exato também
+ * vale quando só um município tem esse nome.
  */
 export function CampoMunicipio({ name, codigo, required }: { name: string; codigo?: string | null; required?: boolean }) {
-  const lista = useId();
   const [texto, setTexto] = useState("");
   const [cod, setCod] = useState(codigo ?? "");
   const [opcoes, setOpcoes] = useState<OpcaoMunicipio[]>([]);
@@ -26,21 +28,25 @@ export function CampoMunicipio({ name, codigo, required }: { name: string; codig
 
   async function digitar(v: string) {
     setTexto(v);
-    const achado = opcoes.find((m) => rotulo(m).toLowerCase() === v.trim().toLowerCase());
+    const alvo = normal(v);
+    const casa = (m: OpcaoMunicipio) => normal(rotulo(m)) === alvo;
+    const achado = opcoes.find(casa);
     setCod(achado ? achado.cod : /^\d{7}$/.test(v.trim()) ? v.trim() : "");
     const n = ++ultimo.current;
     const r = await buscarMunicipios(v);
     if (n !== ultimo.current) return;
     setOpcoes(r);
-    const exato = r.find((m) => rotulo(m).toLowerCase() === v.trim().toLowerCase()) ?? (r.length === 1 && v.includes("/") ? r[0] : undefined);
+    const mesmoNome = r.filter((m) => normal(m.nome) === alvo);
+    const exato = r.find(casa) ?? (mesmoNome.length === 1 ? mesmoNome[0] : undefined);
     if (exato) setCod(exato.cod);
   }
 
   return (
     <>
-      <input list={lista} value={texto} onChange={(e) => void digitar(e.target.value)} placeholder="Digite o nome, ex.: Bagé/RS"
-        required={required} autoComplete="off" aria-invalid={Boolean(texto) && !cod} />
-      <datalist id={lista}>{opcoes.map((m) => <option key={m.cod} value={rotulo(m)} />)}</datalist>
+      <ComboBusca texto={texto} placeholder="Digite o nome, ex.: Bagé/RS" required={required} invalido={Boolean(texto) && !cod}
+        opcoes={opcoes.map((m) => ({ valor: m.cod, rotulo: rotulo(m) }))}
+        onDigitar={(v) => void digitar(v)}
+        onEscolher={(o) => { ++ultimo.current; setTexto(o.rotulo); setCod(o.valor); }} />
       <input type="hidden" name={name} value={cod} />
       {texto && !cod && <span className="suave">Escolha um município da lista.</span>}
     </>

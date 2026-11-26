@@ -31,3 +31,8 @@ button.secundario { background: transparent; color: var(--primaria); } button.pe
 .selo.autorizada { color: var(--ok); border-color: var(--ok); } .selo.rejeitada { color: var(--erro); border-color: var(--erro); }
 .selo.na_fila, .selo.enviando { color: var(--alerta); border-color: var(--alerta); }
 .acoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .suave { color: var(--suave); font-size: 13px; }
+.combo { position: relative; display: block; } .combo > input { width: 100%; }
+.combo-lista { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 2px); margin: 0; padding: 4px 0; list-style: none;
+  max-height: 260px; overflow-y: auto; background: var(--cartao); border: 1px solid var(--borda); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.15); }
+.combo-lista li { padding: 7px 10px; cursor: pointer; color: var(--texto); font-size: 14px; }
+.combo-lista li.ativo { background: var(--primaria); color: #fff; }
