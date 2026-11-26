@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { reais } from "@/lib/money";
 import { notFound } from "next/navigation";
 import { Formulario } from "@/components/formulario";
 import { podeCancelarOuSubstituir } from "@/lib/auth/permissoes";
@@ -28,7 +29,7 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
       <div className="cartao">
         <p><strong>{empresa.razao_social}</strong> ({empresa.cnpj}) → {tomador ? `${tomador.nome} (${tomador.documento})` : "sem tomador"}</p>
         <p>{n.descricao}</p>
-        <p>Valor: R$ {String(n.valor_servico ?? "—").replace(".", ",")} · Competência: {n.competencia?.slice(0, 7)} · ISS {n.iss_retido ? `retido (${n.aliquota_iss}%)` : "não retido"}</p>
+        <p>Valor: {reais(n.valor_servico)} · Competência: {n.competencia?.slice(0, 7)} · ISS {n.iss_retido ? `retido (${n.aliquota_iss}%)` : "não retido"}</p>
         {n.chave_acesso && <p className="suave">Chave de acesso: {n.chave_acesso}</p>}
         {n.id_dps && <p className="suave">DPS: {n.id_dps} · tentativas: {n.tentativas}</p>}
       </div>

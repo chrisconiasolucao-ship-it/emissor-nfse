@@ -50,3 +50,10 @@ export function iguais(a: string, b: string): boolean {
 export function positivo(v: string): boolean {
   return lerValor(v).greaterThan(0);
 }
+
+/** Para a tela: "1350.5" ou 1350.5 (o banco devolve numeric como número) → "R$ 1.350,50"; vazio → "—". */
+export function reais(v: string | number | null | undefined): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const [int, dec] = dinheiro(v).split(".");
+  return `R$ ${int!.replace(/\B(?=(\d{3})+(?!\d))/g, ".")},${dec}`;
+}

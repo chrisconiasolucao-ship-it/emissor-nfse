@@ -45,8 +45,8 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
         codigo_nbs: n.codigo_nbs ?? "",
         descricao: n.descricao,
         cod_municipio_prestacao: n.cod_municipio_prestacao ?? "",
-        valor: n.valor_servico ?? "",
-        aliquota_iss: n.aliquota_iss ?? "",
+        valor: n.valor_servico == null ? "" : String(n.valor_servico),
+        aliquota_iss: n.aliquota_iss == null ? "" : String(n.aliquota_iss),
       };
       retido = Boolean(n.iss_retido);
       if (p.editar) {

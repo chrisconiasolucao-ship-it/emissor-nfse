@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { perfilAtual } from "@/lib/auth/sessao";
+import { reais } from "@/lib/money";
 import { supabaseServidor } from "@/lib/supabase/server";
 
 const ROTULO: Record<string, string> = { rascunho: "Rascunho", na_fila: "Na fila", enviando: "Enviando", autorizada: "Autorizada", rejeitada: "Rejeitada", cancelada: "Cancelada", substituida: "Substituída" };
-const reais = (v: string | null) => (v == null ? "—" : `R$ ${v.replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`);
 
 export default async function Notas({ searchParams }: { searchParams: Promise<{ empresa?: string; situacao?: string; competencia?: string }> }) {
   await perfilAtual();
