@@ -5,6 +5,8 @@ import { segredoDoWorkerConfere } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
 import { cancelarNaReceita } from "@/lib/fila/cancelamento";
 import { abrirCertificadoDaEmpresa } from "@/lib/fila/portas-supabase";
+import { montarPedidoCancelamento } from "@/lib/nfse/evento-builder";
+import { gzipB64 } from "@/lib/nfse/xml";
 import { CAMINHOS, SefinClient, agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -14,7 +16,7 @@ export const maxDuration = 60;
 
 const entrada = z.object({
   nota: z.uuid(),
-  modo: z.enum(["consultar", "cancelar"]),
+  modo: z.enum(["consultar", "sonda", "cancelar"]),
   quem: z.uuid().optional(),
   codigo_motivo: z.enum(["1", "2", "9"]).optional(),
   motivo: z.string().trim().min(15).max(255).optional(),
@@ -52,6 +54,18 @@ export async function POST(req: Request) {
     const cancel = await sefin.diagnosticar("GET", `${CAMINHOS.eventos(chave)}/101101`);
     const nfse = await sefin.diagnosticar("GET", CAMINHOS.nfse(chave));
     return NextResponse.json({ situacao: nota.situacao, eventos, cancelamento: cancel, nfse: { status: nfse.status, contentType: nfse.contentType, inicio: nfse.corpo.slice(0, 200) } });
+  }
+
+  if (d.modo === "sonda") {
+    // pedidos inválidos de propósito (sem efeito): mostram se a Sefin lê o corpo e como responde a erro de leiaute
+    const sefin = new SefinClient(c.SEFIN_BASE_URL, transporteHttps(agenteMtls(cert.pfx, cert.senha)));
+    const caminho = CAMINHOS.eventos(String(nota.chave_acesso));
+    const vazio = await sefin.diagnosticar("POST", caminho, {});
+    const lixo = await sefin.diagnosticar("POST", caminho, { pedidoRegistroEventoXmlGZipB64: gzipB64("<pedRegEvento/>") });
+    const naoAssinado = await sefin.diagnosticar("POST", caminho, {
+      pedidoRegistroEventoXmlGZipB64: gzipB64(montarPedidoCancelamento({ ambiente: "restrita", cnpjAutor: "00000000000000", chaveAcesso: String(nota.chave_acesso), codigoMotivo: "1", motivo: "Sonda sem assinatura, deve ser recusada", em: new Date() }).xml),
+    });
+    return NextResponse.json({ vazio, lixo, naoAssinado });
   }
 
   if (!d.quem || !d.codigo_motivo || !d.motivo) return NextResponse.json({ erro: "cancelar exige quem, codigo_motivo e motivo" }, { status: 400 });
