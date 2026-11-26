@@ -10,7 +10,8 @@ import { exigir, podeCriarUsuario, podeGerirCertificado, podeGerirEmpresas, type
 import { perfilAtual } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
 import { chaveMestra, cifrarArquivo, cifrarTexto } from "@/lib/crypto/cert-vault";
-import { abrirPfx, CertificadoVencido, exigirValido, SenhaCertificadoInvalida } from "@/lib/crypto/pfx";
+import { abrirPfx, CertificadoVencido, exigirValido, SenhaCertificadoInvalida, type CertificadoAberto } from "@/lib/crypto/pfx";
+import { consultarCnpj, sugerirEmpresa, type EmpresaSugerida } from "@/lib/empresa/consulta-cnpj";
 import { cnpjValido } from "@/lib/importacao/planilha";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
@@ -48,29 +49,28 @@ export async function salvarEmpresa(_: Estado, form: FormData): Promise<Estado> 
   redirect(`/empresas/${data.id}`);
 }
 
-/** Envio do pfx (AT-011, AT-013): abre com a senha, confere validade e CNPJ, guarda cifrado. */
-export async function enviarCertificado(_: Estado, form: FormData): Promise<Estado> {
-  const perfil = await perfilAtual();
-  exigir(podeGerirCertificado(perfil), "Só o escritório envia certificado.");
-  const empresaId = z.uuid().parse(form.get("empresa_id"));
+type Perfil = Awaited<ReturnType<typeof perfilAtual>>;
+
+async function lerPfx(form: FormData): Promise<{ pfx: Buffer; senha: string } | { erro: string }> {
   const senha = String(form.get("senha") ?? "");
   const arquivo = form.get("arquivo");
   if (!(arquivo instanceof File) || arquivo.size === 0 || arquivo.size > 64 * 1024) return { erro: "Escolha o arquivo .pfx (A1) do certificado." };
-  const pfx = Buffer.from(await arquivo.arrayBuffer());
-  let aberto;
+  return { pfx: Buffer.from(await arquivo.arrayBuffer()), senha };
+}
+
+function abrirValido(pfx: Buffer, senha: string): CertificadoAberto | { erro: string } {
   try {
-    aberto = exigirValido(abrirPfx(pfx, senha));
+    return exigirValido(abrirPfx(pfx, senha));
   } catch (e) {
     if (e instanceof SenhaCertificadoInvalida) return { erro: "A senha não abre este certificado." };
     if (e instanceof CertificadoVencido) return { erro: `Certificado vencido: ${e.message}.` };
     throw e;
   }
+}
+
+/** Guarda o pfx cifrado (AT-013), desativa o anterior e registra trilha e log de segurança. */
+async function guardarCertificado(empresaId: string, pfx: Buffer, senha: string, aberto: CertificadoAberto, perfil: Perfil): Promise<{ erro?: string }> {
   const admin = supabaseAdmin();
-  const { data: emp } = await admin.from("empresa").select("cnpj").eq("id", empresaId).single();
-  if (!emp) return { erro: "Empresa não encontrada." };
-  if (aberto.cnpjTitular && aberto.cnpjTitular.slice(0, 8) !== String(emp.cnpj).slice(0, 8)) {
-    return { erro: `O certificado é do CNPJ ${aberto.cnpjTitular}, não desta empresa.` };
-  }
   const c = config();
   const chave = chaveMestra(c.CERT_MASTER_KEY);
   const { arquivo: cifrado, meta } = cifrarArquivo(pfx, chave, c.CERT_KEY_VERSION);
@@ -100,8 +100,61 @@ export async function enviarCertificado(_: Estado, form: FormData): Promise<Esta
   const ip = ipDe(await headers());
   await logSeguranca(admin, { evento: "envio_certificado", usuarioId: perfil.usuarioId, email: perfil.email, ip, empresaId, alvo: `certificado:${novo.id}`, detalhe: { titular: aberto.titular, valido_ate: aberto.validoAte.toISOString() } });
   await auditar(admin, { empresaId, acao: "envio_certificado", entidade: "certificado", entidadeId: String(novo.id), depois: { titular: aberto.titular, sha256: aberto.sha256, valido_ate: aberto.validoAte.toISOString() }, quem: perfil.usuarioId, ip });
+  return {};
+}
+
+/** Envio do pfx (AT-011, AT-013): abre com a senha, confere validade e CNPJ, guarda cifrado. */
+export async function enviarCertificado(_: Estado, form: FormData): Promise<Estado> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirCertificado(perfil), "Só o escritório envia certificado.");
+  const empresaId = z.uuid().parse(form.get("empresa_id"));
+  const lido = await lerPfx(form);
+  if ("erro" in lido) return lido;
+  const aberto = abrirValido(lido.pfx, lido.senha);
+  if ("erro" in aberto) return aberto;
+  const { data: emp } = await supabaseAdmin().from("empresa").select("cnpj").eq("id", empresaId).single();
+  if (!emp) return { erro: "Empresa não encontrada." };
+  if (aberto.cnpjTitular && aberto.cnpjTitular.slice(0, 8) !== String(emp.cnpj).slice(0, 8)) {
+    return { erro: `O certificado é do CNPJ ${aberto.cnpjTitular}, não desta empresa.` };
+  }
+  const g = await guardarCertificado(empresaId, lido.pfx, lido.senha, aberto, perfil);
+  if (g.erro) return { erro: g.erro };
   revalidatePath(`/empresas/${empresaId}`);
   return { ok: true, mensagem: `Certificado de ${aberto.titular} guardado, válido até ${aberto.validoAte.toLocaleDateString("pt-BR")}.` };
+}
+
+/**
+ * Cadastro pelo certificado: o A1 dá CNPJ e razão social; a base pública do CNPJ dá município e regime
+ * (Simples ME/EPP ou MEI, AT-024). Cria a empresa e já guarda o certificado.
+ */
+export async function cadastrarPeloCertificado(_: Estado, form: FormData): Promise<Estado> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirEmpresas(perfil) && podeGerirCertificado(perfil), "Só o escritório cadastra empresa.");
+  const lido = await lerPfx(form);
+  if ("erro" in lido) return lido;
+  const aberto = abrirValido(lido.pfx, lido.senha);
+  if ("erro" in aberto) return aberto;
+  if (!aberto.cnpjTitular || !cnpjValido(aberto.cnpjTitular)) {
+    return { erro: "Este certificado não traz CNPJ (é de pessoa física?). Use um e-CNPJ A1 da empresa." };
+  }
+  let sugerida: EmpresaSugerida;
+  try {
+    sugerida = sugerirEmpresa(aberto.cnpjTitular, aberto.titular, await consultarCnpj(aberto.cnpjTitular));
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : String(e) };
+  }
+  const extras = z.object({
+    inscricao_municipal: z.string().trim().max(30).optional().transform((v) => v || null),
+    serie_dps: z.string().regex(/^\d{1,5}$/, "série com até 5 dígitos").default("90001"),
+  }).safeParse({ inscricao_municipal: form.get("inscricao_municipal") ?? undefined, serie_dps: form.get("serie_dps") || undefined });
+  if (!extras.success) return { erro: extras.error.issues.map((i) => i.message).join("; ") };
+  const { municipio, ...campos } = sugerida;
+  const db = await supabaseServidor(); // RLS: só escritório cria empresa
+  const { data, error } = await db.from("empresa").insert({ ...campos, ...extras.data }).select("id").single();
+  if (error) return { erro: error.code === "23505" ? `Já existe empresa com o CNPJ ${sugerida.cnpj}.` : error.message };
+  const g = await guardarCertificado(data.id, lido.pfx, lido.senha, aberto, perfil);
+  if (g.erro) return { erro: `Empresa criada (${sugerida.razao_social}, ${sugerida.regime}, ${municipio}), mas o certificado não foi guardado: ${g.erro}. Envie de novo na página da empresa.` };
+  redirect(`/empresas/${data.id}`);
 }
 
 const usuarioSchema = z.object({
