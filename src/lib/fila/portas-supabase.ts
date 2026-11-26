@@ -47,12 +47,13 @@ export async function abrirCertificadoDaEmpresa(db: SupabaseClient, empresaId: s
   if (arq.error || !arq.data) throw new Error(`não baixou o certificado: ${arq.error?.message ?? "vazio"}`);
   const chave = chaveMestra(c.CERT_MASTER_KEY);
   const pfx = decifrarArquivo(Buffer.from(await arq.data.arrayBuffer()), cert.pfx_cripto as MetaCifra, chave);
-  if (createHash("sha256").update(pfx).digest("hex") !== String(cert.sha256).trim()) {
-    throw new Error("o arquivo do certificado no Storage não confere com o SHA-256 gravado");
-  }
+  // o AES-GCM já recusa arquivo adulterado; o SHA-256 gravado é o do certificado (DER) que foi enviado
   const senha = decifrarTexto(cert.senha_cripto as Cifrado, chave);
-  const aberto = exigirValido(abrirPfx(pfx, senha));
-  return { pfx, senha, aberto };
+  const aberto = abrirPfx(pfx, senha);
+  if (aberto.sha256 !== String(cert.sha256).trim()) {
+    throw new Error("o certificado guardado no Storage não é o que foi enviado (SHA-256 diferente)");
+  }
+  return { pfx, senha, aberto: exigirValido(aberto) };
 }
 
 export function portasSupabase(db: SupabaseClient, dono: string): Portas {
