@@ -15,7 +15,9 @@ export type ArmazemExterno = {
   ler(url: string): Promise<Buffer>;
 };
 
-export function armazemVercelBlob(token: string): ArmazemExterno {
+// token: BLOB_READ_WRITE_TOKEN. Sem token, o SDK usa OIDC da Vercel (BLOB_STORE_ID + VERCEL_OIDC_TOKEN),
+// que é como as lojas Blob novas são ligadas ao projeto.
+export function armazemVercelBlob(token?: string): ArmazemExterno {
   return {
     async gravar(caminho, conteudo, contentType) {
       const { put } = await import("@vercel/blob");

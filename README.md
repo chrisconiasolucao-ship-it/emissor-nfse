@@ -32,7 +32,7 @@ combina com as URLs da Sefin/ADN.
 6. **Vercel**: importe o repositório, ligue a integração Supabase (preenche URL e chaves por ambiente) e
    cadastre as variáveis de `.env.example` em Preview e em Production, com valores diferentes:
    `CERT_MASTER_KEY` (`openssl rand -base64 32`), `WORKER_SECRET` (`openssl rand -hex 32`), `NFSE_AMBIENTE`,
-   `SEFIN_BASE_URL`, `ADN_BASE_URL`, `BLOB_READ_WRITE_TOKEN` (crie um Blob store privado).
+   `SEFIN_BASE_URL`, `ADN_BASE_URL`, `BLOB_READ_WRITE_TOKEN` ou `BLOB_STORE_ID` (crie um Blob store privado e ligue ao projeto; a Vercel preenche).
 7. **Municípios**: entre como escritório, vá em Municípios e importe o painel da Receita (repita todo mês).
 8. **Empresas**: cadastre (só ME, EPP ou MEI), envie o certificado A1 (.pfx + senha) e crie os usuários do cliente.
 

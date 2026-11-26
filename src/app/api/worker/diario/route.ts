@@ -56,9 +56,9 @@ export async function POST(req: Request) {
   }
 
   // 3. âncora e cópia do log fora do banco; 4. verificador contra as âncoras do Blob
-  if (!c.BLOB_READ_WRITE_TOKEN) {
-    await avisar(null, "falha_copia", "BLOB_READ_WRITE_TOKEN não configurado: a âncora e a cópia do log de hoje não foram gravadas.");
-    saida.ancora = { erro: "sem BLOB_READ_WRITE_TOKEN" };
+  if (!c.BLOB_READ_WRITE_TOKEN && !c.BLOB_STORE_ID) {
+    await avisar(null, "falha_copia", "Blob não configurado (BLOB_READ_WRITE_TOKEN ou BLOB_STORE_ID): a âncora e a cópia do log de hoje não foram gravadas.");
+    saida.ancora = { erro: "Blob não configurado" };
   } else {
     const armazem = armazemVercelBlob(c.BLOB_READ_WRITE_TOKEN);
     try {

@@ -29,6 +29,7 @@ const servidorSchema = z.object({
   CERT_ALERTA_DIAS: csvInts("30,15"),
   MUNICIPIOS_ALERTA_DIAS: inteiro(30),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  BLOB_STORE_ID: z.string().optional(),
 });
 
 export type ConfigServidor = z.infer<typeof servidorSchema>;
