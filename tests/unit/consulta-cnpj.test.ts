@@ -8,20 +8,27 @@ describe("cadastro da empresa pelo certificado + consulta do CNPJ", () => {
   it("ME do Simples: preenche regime, município e contato", () => {
     expect(sugerirEmpresa("11222333000181", "EMPRESA A", base)).toEqual({
       cnpj: "11222333000181", razao_social: "EMPRESA A TESTE LTDA", nome_fantasia: null, regime: "ME",
-      cod_municipio: "4301602", municipio: "BAGE/RS", email: "contato@teste.com", telefone: "5332420000" });
+      cod_municipio: "4301602", municipio: "BAGE/RS", email: "contato@teste.com", telefone: "5332420000", avisos: [] });
   });
   it("EPP e MEI", () => {
     expect(sugerirEmpresa("1", "x", { ...base, porte: "EMPRESA DE PEQUENO PORTE" }).regime).toBe("EPP");
     expect(sugerirEmpresa("1", "x", { ...base, opcao_pelo_mei: true }).regime).toBe("MEI");
   });
-  it("AT-024: fora do Simples, baixada ou sem porte claro é recusada", () => {
+  it("AT-024: fora do Simples ou CNPJ baixado é recusado", () => {
     expect(() => sugerirEmpresa("1", "x", { ...base, opcao_pelo_simples: false })).toThrow(EmpresaForaDoEscopo);
     expect(() => sugerirEmpresa("1", "x", { ...base, descricao_situacao_cadastral: "BAIXADA" })).toThrow(EmpresaForaDoEscopo);
-    expect(() => sugerirEmpresa("1", "x", { ...base, porte: "DEMAIS" })).toThrow(EmpresaForaDoEscopo);
   });
-  it("sem razão social na consulta usa a do certificado; sem IBGE pede cadastro à mão", () => {
+  it("porte DEMAIS no Simples: traz os dados e pede para escolher ME ou EPP", () => {
+    const s = sugerirEmpresa("1", "x", { ...base, porte: "DEMAIS" });
+    expect(s.regime).toBeNull();
+    expect(s.cod_municipio).toBe("4301602");
+    expect(s.avisos[0]).toMatch(/Escolha o regime/);
+  });
+  it("sem razão social na consulta usa a do certificado; sem IBGE pede o município pelo nome", () => {
     expect(sugerirEmpresa("1", "NOME DO CERT", { ...base, razao_social: "" }).razao_social).toBe("NOME DO CERT");
-    expect(() => sugerirEmpresa("1", "x", { ...base, codigo_municipio_ibge: null })).toThrow(/à mão/);
+    const s = sugerirEmpresa("1", "x", { ...base, codigo_municipio_ibge: null });
+    expect(s.cod_municipio).toBeNull();
+    expect(s.avisos.join(" ")).toMatch(/pelo nome/);
   });
 });
 

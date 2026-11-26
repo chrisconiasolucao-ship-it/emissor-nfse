@@ -41,7 +41,7 @@ const notaSchema = z
     codigo_tributacao_nacional: txt(6).regex(/^\d{6}$/, "código de tributação com 6 dígitos"),
     codigo_nbs: opc(9),
     descricao: txt(2000).min(1, "informe a descrição"),
-    cod_municipio_prestacao: txt(7).regex(/^\d{7}$/, "município da prestação (código IBGE)"),
+    cod_municipio_prestacao: txt(7).regex(/^\d{7}$/, "escolha o município da prestação na lista"),
     valor: txt(30).refine((v) => {
       try {
         return lerValor(v).greaterThan(0);

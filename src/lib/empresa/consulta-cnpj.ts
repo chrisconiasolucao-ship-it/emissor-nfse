@@ -20,11 +20,12 @@ export type EmpresaSugerida = {
   cnpj: string;
   razao_social: string;
   nome_fantasia: string | null;
-  regime: "ME" | "EPP" | "MEI";
-  cod_municipio: string;
+  regime: "ME" | "EPP" | "MEI" | null; // null: a consulta não diz; o usuário escolhe
+  cod_municipio: string | null;
   municipio: string;
   email: string | null;
   telefone: string | null;
+  avisos: string[];
 };
 
 export class EmpresaForaDoEscopo extends Error {}
@@ -72,29 +73,38 @@ export async function consultarCnpj(cnpj: string, fetcher: typeof fetch = fetch)
   throw new Error(`A consulta do CNPJ não respondeu (${falhas.join(", ")}). Tente de novo ou cadastre à mão.`);
 }
 
-/** AT-024: 1ª versão só Simples Nacional (ME/EPP) e MEI. */
+/**
+ * Sugestão para o formulário de cadastro (o usuário confere antes de gravar).
+ * AT-024: recusa só o que com certeza está fora (não optante do Simples/MEI, CNPJ não ativo);
+ * porte "DEMAIS" ou ausente vira aviso e o usuário escolhe ME ou EPP.
+ */
 export function sugerirEmpresa(cnpj: string, titularCertificado: string, d: DadosCnpj): EmpresaSugerida {
   if (d.descricao_situacao_cadastral && d.descricao_situacao_cadastral.toUpperCase() !== "ATIVA") {
     throw new EmpresaForaDoEscopo(`CNPJ com situação cadastral ${d.descricao_situacao_cadastral}.`);
   }
+  if (!d.opcao_pelo_mei && d.opcao_pelo_simples === false) {
+    throw new EmpresaForaDoEscopo("A consulta diz que a empresa não é optante do Simples Nacional nem MEI; a 1ª versão emite só para essas.");
+  }
+  const avisos: string[] = [];
   const porte = String(d.porte ?? "").toUpperCase();
-  let regime: EmpresaSugerida["regime"];
+  let regime: EmpresaSugerida["regime"] = null;
   if (d.opcao_pelo_mei) regime = "MEI";
-  else if (d.opcao_pelo_simples && porte.includes("MICRO")) regime = "ME";
-  else if (d.opcao_pelo_simples && porte.includes("PEQUENO")) regime = "EPP";
-  else if (d.opcao_pelo_simples) throw new EmpresaForaDoEscopo(`Optante do Simples, mas o porte "${d.porte ?? "não informado"}" não diz se é ME ou EPP. Cadastre à mão.`);
-  else throw new EmpresaForaDoEscopo("A empresa não é optante do Simples Nacional nem MEI; a 1ª versão emite só para essas.");
+  else if (porte.includes("MICRO")) regime = "ME";
+  else if (porte.includes("PEQUENO")) regime = "EPP";
+  else avisos.push(`A consulta informa porte "${d.porte || "não informado"}", que não diz se é ME ou EPP. Escolha o regime.`);
+  if (d.opcao_pelo_simples == null && !d.opcao_pelo_mei) avisos.push("A consulta não informou a opção pelo Simples. Confira antes de emitir.");
   const cod = String(d.codigo_municipio_ibge ?? "").replace(/\D/g, "");
-  if (!/^\d{7}$/.test(cod)) throw new Error("A consulta não trouxe o código IBGE do município. Cadastre à mão.");
+  if (!/^\d{7}$/.test(cod)) avisos.push("A consulta não trouxe o município. Escolha pelo nome.");
   const tel = String(d.ddd_telefone_1 ?? "").replace(/\D/g, "");
   return {
     cnpj,
     razao_social: (d.razao_social || titularCertificado).trim(),
     nome_fantasia: d.nome_fantasia?.trim() || null,
     regime,
-    cod_municipio: cod,
+    cod_municipio: /^\d{7}$/.test(cod) ? cod : null,
     municipio: [d.municipio, d.uf].filter(Boolean).join("/"),
     email: d.email?.trim().toLowerCase() || null,
     telefone: tel || null,
+    avisos,
   };
 }

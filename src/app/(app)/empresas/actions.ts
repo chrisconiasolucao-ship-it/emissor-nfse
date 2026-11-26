@@ -11,7 +11,7 @@ import { perfilAtual } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
 import { chaveMestra, cifrarArquivo, cifrarTexto } from "@/lib/crypto/cert-vault";
 import { abrirPfx, CertificadoVencido, exigirValido, SenhaCertificadoInvalida, type CertificadoAberto } from "@/lib/crypto/pfx";
-import { consultarCnpj, sugerirEmpresa, type EmpresaSugerida } from "@/lib/empresa/consulta-cnpj";
+import { consultarCnpj, EmpresaForaDoEscopo, sugerirEmpresa, type EmpresaSugerida } from "@/lib/empresa/consulta-cnpj";
 import { cnpjValido } from "@/lib/importacao/planilha";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
@@ -25,7 +25,7 @@ const empresaSchema = z.object({
   // AT-024: só Simples Nacional (ME/EPP) e MEI
   regime: z.enum(["ME", "EPP", "MEI"], { message: "a 1ª versão emite só para Simples Nacional (ME/EPP) e MEI" }),
   inscricao_municipal: z.string().trim().max(30).optional().transform((v) => v || null),
-  cod_municipio: z.string().regex(/^\d{7}$/, "código IBGE do município com 7 dígitos"),
+  cod_municipio: z.string().regex(/^\d{7}$/, "escolha o município na lista"),
   email: z.string().trim().max(200).optional().transform((v) => v || null),
   telefone: z.string().trim().max(30).optional().transform((v) => v || null),
   serie_dps: z.string().regex(/^\d{1,5}$/, "série com até 5 dígitos").default("90001"),
@@ -123,11 +123,10 @@ export async function enviarCertificado(_: Estado, form: FormData): Promise<Esta
   return { ok: true, mensagem: `Certificado de ${aberto.titular} guardado, válido até ${aberto.validoAte.toLocaleDateString("pt-BR")}.` };
 }
 
-/**
- * Cadastro pelo certificado: o A1 dá CNPJ e razão social; a base pública do CNPJ dá município e regime
- * (Simples ME/EPP ou MEI, AT-024). Cria a empresa e já guarda o certificado.
- */
-export async function cadastrarPeloCertificado(_: Estado, form: FormData): Promise<Estado> {
+export type SugestaoCadastro = EmpresaSugerida & { titular: string; validoAte: string };
+
+/** Cadastro pelo certificado, etapa 1: lê o A1 e consulta o CNPJ; nada é gravado. */
+export async function lerCertificadoParaCadastro(form: FormData): Promise<{ erro: string } | { sugestao: SugestaoCadastro }> {
   const perfil = await perfilAtual();
   exigir(podeGerirEmpresas(perfil) && podeGerirCertificado(perfil), "Só o escritório cadastra empresa.");
   const lido = await lerPfx(form);
@@ -137,24 +136,42 @@ export async function cadastrarPeloCertificado(_: Estado, form: FormData): Promi
   if (!aberto.cnpjTitular || !cnpjValido(aberto.cnpjTitular)) {
     return { erro: "Este certificado não traz CNPJ (é de pessoa física?). Use um e-CNPJ A1 da empresa." };
   }
-  let sugerida: EmpresaSugerida;
   try {
-    sugerida = sugerirEmpresa(aberto.cnpjTitular, aberto.titular, await consultarCnpj(aberto.cnpjTitular));
+    const s = sugerirEmpresa(aberto.cnpjTitular, aberto.titular, await consultarCnpj(aberto.cnpjTitular));
+    return { sugestao: { ...s, titular: aberto.titular, validoAte: aberto.validoAte.toISOString() } };
   } catch (e) {
-    return { erro: e instanceof Error ? e.message : String(e) };
+    if (e instanceof EmpresaForaDoEscopo) return { erro: e.message };
+    // consulta fora do ar: segue só com o que o certificado traz
+    return { sugestao: { cnpj: aberto.cnpjTitular, razao_social: aberto.titular, nome_fantasia: null, regime: null, cod_municipio: null,
+      municipio: "", email: null, telefone: null, titular: aberto.titular, validoAte: aberto.validoAte.toISOString(),
+      avisos: [`${e instanceof Error ? e.message : String(e)} Preencha regime e município.`] } };
   }
-  const extras = z.object({
-    inscricao_municipal: z.string().trim().max(30).optional().transform((v) => v || null),
-    serie_dps: z.string().regex(/^\d{1,5}$/, "série com até 5 dígitos").default("90001"),
-  }).safeParse({ inscricao_municipal: form.get("inscricao_municipal") ?? undefined, serie_dps: form.get("serie_dps") || undefined });
-  if (!extras.success) return { erro: extras.error.issues.map((i) => i.message).join("; ") };
-  const { municipio, ...campos } = sugerida;
+}
+
+/**
+ * Cadastro pelo certificado, etapa 2: o usuário conferiu os dados. Abre o A1 de novo (o CNPJ gravado é sempre
+ * o do certificado), cria a empresa e guarda o certificado.
+ */
+export async function cadastrarPeloCertificado(form: FormData): Promise<{ erro: string } | { id: string }> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirEmpresas(perfil) && podeGerirCertificado(perfil), "Só o escritório cadastra empresa.");
+  const lido = await lerPfx(form);
+  if ("erro" in lido) return lido;
+  const aberto = abrirValido(lido.pfx, lido.senha);
+  if ("erro" in aberto) return aberto;
+  if (!aberto.cnpjTitular) return { erro: "Este certificado não traz CNPJ." };
+  const campos = Object.fromEntries([...form.entries()].filter(([k]) => !["arquivo", "senha"].includes(k)));
+  const r = empresaSchema.safeParse({ ...campos, cnpj: aberto.cnpjTitular, id: "" });
+  if (!r.success) return { erro: r.error.issues.map((i) => i.message).join("; ") };
+  const { id, ...dados } = r.data;
+  void id;
   const db = await supabaseServidor(); // RLS: só escritório cria empresa
-  const { data, error } = await db.from("empresa").insert({ ...campos, ...extras.data }).select("id").single();
-  if (error) return { erro: error.code === "23505" ? `Já existe empresa com o CNPJ ${sugerida.cnpj}.` : error.message };
+  const { data, error } = await db.from("empresa").insert(dados).select("id").single();
+  if (error) return { erro: error.code === "23505" ? `Já existe empresa com o CNPJ ${dados.cnpj}.` : error.message };
   const g = await guardarCertificado(data.id, lido.pfx, lido.senha, aberto, perfil);
-  if (g.erro) return { erro: `Empresa criada (${sugerida.razao_social}, ${sugerida.regime}, ${municipio}), mas o certificado não foi guardado: ${g.erro}. Envie de novo na página da empresa.` };
-  redirect(`/empresas/${data.id}`);
+  if (g.erro) return { erro: `Empresa criada, mas o certificado não foi guardado: ${g.erro}. Envie de novo na página da empresa.` };
+  revalidatePath("/empresas");
+  return { id: data.id };
 }
 
 const usuarioSchema = z.object({

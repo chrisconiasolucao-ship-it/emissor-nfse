@@ -3,7 +3,9 @@ import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { supabaseServidor } from "@/lib/supabase/server";
-import { cadastrarPeloCertificado, salvarEmpresa } from "./actions";
+import { salvarEmpresa } from "./actions";
+import { CadastroPeloCertificado } from "./cadastro-certificado";
+import { CampoMunicipio } from "@/components/campo-municipio";
 
 export default async function Empresas() {
   const perfil = await perfilAtual();
@@ -29,14 +31,9 @@ export default async function Empresas() {
       {eEscritorio(perfil) && (
         <>
           <h2>Cadastrar pelo certificado</h2>
-          <p className="suave">Envie o A1 (.pfx) da empresa. CNPJ e razão social saem do certificado; município e regime (ME, EPP ou MEI) vêm da consulta pública do CNPJ. O certificado já fica guardado.</p>
+          <p className="suave">Envie o A1 (.pfx) da empresa. CNPJ e razão social saem do certificado; município e regime vêm da consulta pública do CNPJ. Você confere antes de gravar, e o certificado já fica guardado.</p>
           <div className="cartao">
-            <Formulario acao={cadastrarPeloCertificado} className="grade" botao={<button type="submit">Cadastrar pelo certificado</button>}>
-              <label className="largo">Certificado A1 (.pfx)<input name="arquivo" type="file" accept=".pfx,.p12" required /></label>
-              <label>Senha do certificado<input name="senha" type="password" required autoComplete="off" /></label>
-              <label>Inscrição municipal<input name="inscricao_municipal" /></label>
-              <label>Série da DPS<input name="serie_dps" defaultValue="90001" pattern="\d{1,5}" /></label>
-            </Formulario>
+            <CadastroPeloCertificado />
           </div>
           <h2>Cadastrar à mão</h2>
           <div className="cartao">
@@ -51,7 +48,7 @@ export default async function Empresas() {
                   <option value="MEI">MEI</option>
                 </select>
               </label>
-              <label>Município (código IBGE)<input name="cod_municipio" required pattern="\d{7}" /></label>
+              <label>Município<CampoMunicipio name="cod_municipio" required /></label>
               <label>Inscrição municipal<input name="inscricao_municipal" /></label>
               <label>E-mail<input name="email" type="email" /></label>
               <label>Telefone<input name="telefone" /></label>

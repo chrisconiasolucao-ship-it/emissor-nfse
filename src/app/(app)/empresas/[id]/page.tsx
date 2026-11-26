@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { CampoMunicipio } from "@/components/campo-municipio";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio, podeCriarUsuario } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
@@ -44,7 +45,7 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
                 <option value="ME">Simples Nacional — ME</option><option value="EPP">Simples Nacional — EPP</option><option value="MEI">MEI</option>
               </select>
             </label>
-            <label>Município (IBGE)<input name="cod_municipio" defaultValue={e.cod_municipio} pattern="\d{7}" /></label>
+            <label>Município<CampoMunicipio name="cod_municipio" codigo={e.cod_municipio} required /></label>
             <label>Inscrição municipal<input name="inscricao_municipal" defaultValue={e.inscricao_municipal ?? ""} /></label>
             <label>E-mail<input name="email" defaultValue={e.email ?? ""} /></label>
             <label>Telefone<input name="telefone" defaultValue={e.telefone ?? ""} /></label>

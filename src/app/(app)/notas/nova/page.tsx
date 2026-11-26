@@ -1,3 +1,4 @@
+import { CampoMunicipio } from "@/components/campo-municipio";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
@@ -124,14 +125,14 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           <label className="largo">Nome do tomador<input name="tomador_nome" defaultValue={v.tomador_nome} required /></label>
           <label>E-mail<input name="tomador_email" type="email" defaultValue={v.tomador_email} /></label>
           <label>CEP<input name="tomador_cep" defaultValue={v.tomador_cep} /></label>
-          <label>Município do tomador (IBGE)<input name="tomador_cod_municipio" defaultValue={v.tomador_cod_municipio} /></label>
+          <label>Município do tomador<CampoMunicipio name="tomador_cod_municipio" codigo={v.tomador_cod_municipio} /></label>
           <label>Logradouro<input name="tomador_logradouro" defaultValue={v.tomador_logradouro} /></label>
           <label>Número<input name="tomador_numero" defaultValue={v.tomador_numero} /></label>
           <label>Complemento<input name="tomador_complemento" defaultValue={v.tomador_complemento} /></label>
           <label>Bairro<input name="tomador_bairro" defaultValue={v.tomador_bairro} /></label>
           <label>Cód. tributação nacional<input name="codigo_tributacao_nacional" defaultValue={v.codigo_tributacao_nacional} required pattern="\d{6}" /></label>
           <label>NBS<input name="codigo_nbs" defaultValue={v.codigo_nbs} pattern="\d{9}" /></label>
-          <label>Município da prestação (IBGE)<input name="cod_municipio_prestacao" defaultValue={v.cod_municipio_prestacao || munPadrao} required pattern="\d{7}" /></label>
+          <label>Município da prestação<CampoMunicipio name="cod_municipio_prestacao" codigo={v.cod_municipio_prestacao || munPadrao} required /></label>
           <label className="largo">Descrição do serviço<textarea name="descricao" defaultValue={v.descricao} required maxLength={2000} /></label>
           <label>Valor (R$)<input name="valor" defaultValue={v.valor?.replace(".", ",")} required inputMode="decimal" /></label>
           <label>Competência<input name="competencia" type="month" defaultValue={v.competencia} required /></label>
