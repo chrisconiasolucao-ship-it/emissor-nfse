@@ -29,11 +29,47 @@ export type EmpresaSugerida = {
 
 export class EmpresaForaDoEscopo extends Error {}
 
-export async function consultarCnpj(cnpj: string): Promise<DadosCnpj> {
-  const r = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`, { signal: AbortSignal.timeout(15_000), headers: { accept: "application/json" } });
-  if (r.status === 404) throw new Error(`CNPJ ${cnpj} não encontrado na base pública da Receita.`);
-  if (!r.ok) throw new Error(`A consulta do CNPJ não respondeu (HTTP ${r.status}). Tente de novo ou cadastre à mão.`);
-  return (await r.json()) as DadosCnpj;
+const UA = { accept: "application/json", "user-agent": "emissor-nfse/1.0 (cadastro de empresas)" };
+
+type Fonte = { nome: string; url: (cnpj: string) => string; mapear: (j: unknown) => DadosCnpj };
+
+/** CNPJ.ws (formato próprio) → mesmo formato da BrasilAPI. */
+function deCnpjWs(j: unknown): DadosCnpj {
+  const d = j as { razao_social?: string; porte?: { descricao?: string }; simples?: { simples?: string; mei?: string } | null;
+    estabelecimento?: { nome_fantasia?: string; situacao_cadastral?: string; email?: string; ddd1?: string; telefone1?: string;
+      cidade?: { ibge_id?: number; nome?: string }; estado?: { sigla?: string } } };
+  const e = d.estabelecimento ?? {};
+  return {
+    razao_social: d.razao_social, nome_fantasia: e.nome_fantasia ?? null,
+    codigo_municipio_ibge: e.cidade?.ibge_id ?? null, municipio: e.cidade?.nome ?? null, uf: e.estado?.sigla ?? null,
+    porte: d.porte?.descricao ?? null,
+    opcao_pelo_simples: d.simples ? d.simples.simples === "Sim" : false, opcao_pelo_mei: d.simples ? d.simples.mei === "Sim" : false,
+    email: e.email ?? null, ddd_telefone_1: `${e.ddd1 ?? ""}${e.telefone1 ?? ""}` || null,
+    descricao_situacao_cadastral: e.situacao_cadastral ?? null,
+  };
+}
+
+const FONTES: Fonte[] = [
+  { nome: "BrasilAPI", url: (c) => `https://brasilapi.com.br/api/cnpj/v1/${c}`, mapear: (j) => j as DadosCnpj },
+  { nome: "Minha Receita", url: (c) => `https://minhareceita.org/${c}`, mapear: (j) => j as DadosCnpj },
+  { nome: "CNPJ.ws", url: (c) => `https://publica.cnpj.ws/cnpj/${c}`, mapear: deCnpjWs },
+];
+
+/** Tenta as fontes públicas (todas espelham os dados abertos da Receita) até uma responder. */
+export async function consultarCnpj(cnpj: string, fetcher: typeof fetch = fetch): Promise<DadosCnpj> {
+  const falhas: string[] = [];
+  for (const f of FONTES) {
+    try {
+      const r = await fetcher(f.url(cnpj), { signal: AbortSignal.timeout(12_000), headers: UA });
+      if (r.status === 404) throw new Error(`CNPJ ${cnpj} não encontrado na base pública da Receita.`);
+      if (!r.ok) { falhas.push(`${f.nome} HTTP ${r.status}`); continue; }
+      return f.mapear(await r.json());
+    } catch (e) {
+      if (e instanceof Error && e.message.includes("não encontrado")) throw e;
+      falhas.push(`${f.nome} ${e instanceof Error ? e.name : "erro"}`);
+    }
+  }
+  throw new Error(`A consulta do CNPJ não respondeu (${falhas.join(", ")}). Tente de novo ou cadastre à mão.`);
 }
 
 /** AT-024: 1ª versão só Simples Nacional (ME/EPP) e MEI. */

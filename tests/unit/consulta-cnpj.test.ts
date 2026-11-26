@@ -24,3 +24,27 @@ describe("cadastro da empresa pelo certificado + consulta do CNPJ", () => {
     expect(() => sugerirEmpresa("1", "x", { ...base, codigo_municipio_ibge: null })).toThrow(/à mão/);
   });
 });
+
+describe("consulta do CNPJ com fontes alternativas", () => {
+  const resp = (status: number, corpo: unknown) => new Response(JSON.stringify(corpo), { status });
+  it("se a primeira fonte recusa (403), usa a próxima", async () => {
+    const urls: string[] = [];
+    const f = (async (u: string) => { urls.push(u); return urls.length === 1 ? resp(403, {}) : resp(200, { razao_social: "X" }); }) as unknown as typeof fetch;
+    const { consultarCnpj } = await import("@/lib/empresa/consulta-cnpj");
+    expect((await consultarCnpj("11222333000181", f)).razao_social).toBe("X");
+    expect(urls.length).toBe(2);
+  });
+  it("converte o formato do CNPJ.ws", async () => {
+    const ws = { razao_social: "Y", porte: { descricao: "Micro Empresa" }, simples: { simples: "Sim", mei: "Não" },
+      estabelecimento: { situacao_cadastral: "Ativa", cidade: { ibge_id: 4301602, nome: "Bagé" }, estado: { sigla: "RS" } } };
+    let n = 0;
+    const f = (async () => (++n < 3 ? resp(503, {}) : resp(200, ws))) as unknown as typeof fetch;
+    const { consultarCnpj } = await import("@/lib/empresa/consulta-cnpj");
+    expect(sugerirEmpresa("11222333000181", "Y", await consultarCnpj("11222333000181", f))).toMatchObject({ regime: "ME", cod_municipio: "4301602" });
+  });
+  it("todas falhando: mensagem diz quais fontes falharam", async () => {
+    const f = (async () => resp(403, {})) as unknown as typeof fetch;
+    const { consultarCnpj } = await import("@/lib/empresa/consulta-cnpj");
+    await expect(consultarCnpj("1", f)).rejects.toThrow(/BrasilAPI HTTP 403, Minha Receita HTTP 403, CNPJ.ws HTTP 403/);
+  });
+});
