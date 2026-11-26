@@ -1,0 +1,23 @@
+# Configuração do Supabase CLI. O project_id é só um nome local; a ref real fica em supabase/.temp/project-ref.
+project_id = "emissor-nfse"
+
+[api]
+schemas = ["public", "graphql_public"]
+
+[db]
+major_version = 17
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[auth]
+site_url = "http://localhost:3000"
+enable_signup = false
+
+[auth.rate_limit]
+# Decision 9: o bloqueio por conta é feito em /api/auth/login; aqui só reduzimos tentativas diretas.
+sign_in_sign_ups = 10
+
+[storage]
+file_size_limit = "10MiB"
