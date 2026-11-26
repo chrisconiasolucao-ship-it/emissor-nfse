@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {escritorio && <Link href="/painel">Painel</Link>}
           <Link href="/notas">Notas</Link>
           <Link href="/notas/nova">Nova nota</Link>
+          <Link href="/cadastros">Cadastros</Link>
           <Link href="/importar">Importar</Link>
           {escritorio && <Link href="/avisos">Avisos</Link>}
           {(escritorio || perfil.papel === "cliente_admin") && <Link href="/empresas">Empresas</Link>}

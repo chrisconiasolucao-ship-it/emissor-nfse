@@ -14,6 +14,7 @@ import { lerPlanilha, PlanilhaGrandeDemais, PlanilhaInvalida, sha256, type Linha
 import { competenciaAtual, repetirMes } from "@/lib/importacao/repetir-mes";
 import { dinheiro, lerValor } from "@/lib/money";
 import { type CodigoCancelamento } from "@/lib/nfse/evento-builder";
+import { aprenderDaNfse, guardarServico } from "@/lib/cadastros/aprender";
 import { cancelarNaReceita } from "@/lib/fila/cancelamento";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
@@ -56,6 +57,8 @@ const notaSchema = z
     nota_substituida_id: z.uuid().optional().or(z.literal("").transform(() => undefined)),
     codigo_motivo_substituicao: z.enum(["01", "02", "03", "04", "05", "99"]).optional().or(z.literal("").transform(() => undefined)),
     motivo_substituicao: opc(255),
+    servico_id: z.uuid().optional().or(z.literal("").transform(() => undefined)),
+    guardar_servico: z.string().optional().transform((v) => v === "on" || v === "true"),
     acao: z.enum(["rascunho", "emitir"]),
     confirmar_duplicidade: z.string().optional().transform((v) => v === "sim"),
   })
@@ -110,10 +113,24 @@ export async function salvarNota(_: Estado, form: FormData): Promise<Estado> {
   });
   const valor = dinheiro(d.valor);
   const competencia = `${d.competencia}-01`;
+  // serviço novo digitado na nota entra no cadastro (sem duplicar código + descrição)
+  if (d.guardar_servico && !d.servico_id) {
+    await guardarServico(db, d.empresa_id, {
+      codigo_tributacao_nacional: d.codigo_tributacao_nacional,
+      codigo_nbs: d.codigo_nbs,
+      descricao: d.descricao,
+      cod_municipio_prestacao: d.cod_municipio_prestacao,
+      iss_retido: d.iss_retido,
+      aliquota_iss: d.iss_retido ? lerValor(d.aliquota_iss!).toFixed(2) : null,
+      valor_padrao: valor,
+      origem: "nota",
+    }).catch((e) => console.error(JSON.stringify({ acao: "guardar_servico", erro: e instanceof Error ? e.message : String(e) })));
+  }
   const campos = {
     empresa_id: d.empresa_id,
     origem: d.origem,
     tomador_id: tomadorId,
+    servico_id: d.servico_id ?? null,
     codigo_tributacao_nacional: d.codigo_tributacao_nacional,
     codigo_nbs: d.codigo_nbs,
     descricao: d.descricao,
@@ -305,8 +322,9 @@ export async function importarXmlModelo(_: Estado, form: FormData): Promise<Esta
   if (!(arquivo instanceof File) || arquivo.size === 0 || arquivo.size > 1024 * 1024) return { erro: "Escolha um XML de NFS-e (até 1 MB)." };
   const buf = Buffer.from(await arquivo.arrayBuffer());
   const { lerNfse } = await import("@/lib/nfse/nfse-parser");
+  let modelo;
   try {
-    lerNfse(buf.toString("utf8"));
+    modelo = lerNfse(buf.toString("utf8"));
   } catch (e) {
     return { erro: `Não é uma NFS-e do padrão nacional: ${e instanceof Error ? e.message : e}` };
   }
@@ -318,6 +336,9 @@ export async function importarXmlModelo(_: Estado, form: FormData): Promise<Esta
   const doc = await admin.from("documento").insert({ empresa_id: empresaId, tipo: "xml_origem", storage_path: caminho, sha256: hash, tamanho: buf.length, content_type: "application/xml", nome_original: arquivo.name, criado_por: perfil.usuarioId }).select("id").single();
   if (doc.error?.code === "23505") return { erro: "Este XML já foi importado. Nada novo foi importado." };
   if (doc.error) return { erro: doc.error.message };
+  // nota emitida pela empresa: tomador e serviço vão para os cadastros (sem sobrescrever o que já existe)
+  const { data: emp } = await admin.from("empresa").select("cnpj").eq("id", empresaId).single();
+  if (emp) await aprenderDaNfse(await supabaseServidor(), { id: empresaId, cnpj: String(emp.cnpj) }, modelo, "xml").catch((e) => console.error(JSON.stringify({ acao: "cadastro_xml", erro: e instanceof Error ? e.message : String(e) })));
   redirect(`/notas/nova?empresa=${empresaId}&documento=${doc.data.id}`);
 }
 

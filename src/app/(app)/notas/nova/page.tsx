@@ -1,4 +1,7 @@
+import Link from "next/link";
+import { Suspense } from "react";
 import { CampoMunicipio } from "@/components/campo-municipio";
+import { EscolherCadastro } from "@/components/escolher-cadastro";
 import { CamposServico } from "@/components/campos-servico";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
@@ -12,7 +15,7 @@ import { salvarNota } from "../actions";
 type Valores = Partial<Record<string, string>>;
 
 /** Nota avulsa, a partir de nota anterior (?modelo=<nota>), de XML importado (?documento=<doc>) ou substituição (?substitui=<nota>). */
-export default async function NovaNota({ searchParams }: { searchParams: Promise<{ empresa?: string; modelo?: string; documento?: string; substitui?: string; editar?: string }> }) {
+export default async function NovaNota({ searchParams }: { searchParams: Promise<{ empresa?: string; modelo?: string; documento?: string; substitui?: string; editar?: string; tomador?: string; servico?: string }> }) {
   const perfil = await perfilAtual();
   const p = await searchParams;
   const db = await supabaseServidor();
@@ -93,14 +96,65 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
       }
     }
   }
+  // cadastros salvos escolhidos no topo da tela (?tomador=<id>&servico=<id>) preenchem por cima
+  let rotuloTomador: string | undefined;
+  let rotuloServico: string | undefined;
+  let servicoId: string | undefined;
+  if (p.tomador && p.empresa) {
+    const { data: t } = await db.from("tomador").select("*").eq("empresa_id", p.empresa).eq("id", p.tomador).maybeSingle();
+    if (t) {
+      v = {
+        ...v,
+        empresa_id: p.empresa,
+        tomador_tipo: t.tipo_documento === "CNPJ" ? "CNPJ" : "CPF",
+        tomador_documento: t.documento ?? "",
+        tomador_nome: t.nome ?? "",
+        tomador_email: t.email ?? "",
+        tomador_cep: t.cep ?? "",
+        tomador_cod_municipio: t.cod_municipio ?? "",
+        tomador_logradouro: t.logradouro ?? "",
+        tomador_numero: t.numero ?? "",
+        tomador_complemento: t.complemento ?? "",
+        tomador_bairro: t.bairro ?? "",
+      };
+      rotuloTomador = `${t.nome} · ${t.tipo_documento} ${t.documento}`;
+    }
+  }
+  if (p.servico && p.empresa) {
+    const { data: sv } = await db.from("servico").select("*").eq("empresa_id", p.empresa).eq("id", p.servico).maybeSingle();
+    if (sv) {
+      v = {
+        ...v,
+        empresa_id: p.empresa,
+        codigo_tributacao_nacional: sv.codigo_tributacao_nacional ?? "",
+        codigo_nbs: sv.codigo_nbs ?? "",
+        descricao: sv.descricao ?? "",
+        cod_municipio_prestacao: sv.cod_municipio_prestacao ?? v.cod_municipio_prestacao ?? "",
+        valor: sv.valor_padrao == null ? v.valor : String(sv.valor_padrao),
+        aliquota_iss: sv.aliquota_iss == null ? "" : String(sv.aliquota_iss),
+      };
+      retido = Boolean(sv.iss_retido);
+      servicoId = String(sv.id);
+      rotuloServico = `${sv.nome ? `${sv.nome} · ` : ""}${sv.codigo_tributacao_nacional} · ${String(sv.descricao).slice(0, 70)}`;
+    }
+  }
   const empresaId = v.empresa_id ?? empresaPadrao;
   const munPadrao = (empresas ?? []).find((e) => e.id === empresaId)?.cod_municipio ?? "";
 
   return (
     <>
       <h1>{titulo}</h1>
+      {!v.id && !p.substitui && (
+        <div className="cartao">
+          <p className="suave">Preencha mais rápido com um cadastro salvo da empresa (veja e edite em <Link href={`/cadastros${empresaId ? `?empresa=${empresaId}` : ""}`}>Cadastros</Link>).</p>
+          <Suspense>
+            <EscolherCadastro empresaPadrao={empresaId} tomador={rotuloTomador} servico={rotuloServico} />
+          </Suspense>
+        </div>
+      )}
       <div className="cartao">
         <Formulario
+          key={JSON.stringify(p)}
           acao={salvarNota}
           className="grade"
           botao={
@@ -138,6 +192,11 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           <label>Competência<input name="competencia" type="month" defaultValue={v.competencia} required /></label>
           <label>ISS retido pelo tomador<input name="iss_retido" type="checkbox" defaultChecked={retido} /></label>
           <label>Alíquota ISS (%) se retido<input name="aliquota_iss" defaultValue={v.aliquota_iss} inputMode="decimal" /></label>
+          {servicoId ? (
+            <input type="hidden" name="servico_id" value={servicoId} />
+          ) : (
+            <label>Guardar este serviço nos cadastros<input name="guardar_servico" type="checkbox" defaultChecked={!v.id} /></label>
+          )}
           {p.substitui && (
             <>
               <input type="hidden" name="nota_substituida_id" value={p.substitui} />

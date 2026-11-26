@@ -7,6 +7,7 @@ import { abrirCertificadoDaEmpresa } from "@/lib/fila/portas-supabase";
 import { sha256 } from "@/lib/importacao/planilha";
 import { AdnClient } from "@/lib/nfse/adn-client";
 import { lerNfse } from "@/lib/nfse/nfse-parser";
+import { aprenderDaNfse } from "@/lib/cadastros/aprender";
 import { agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
         let nsu = BigInt(String(cur?.ultimo_nsu ?? 0));
         let novos = 0;
         let repetidos = 0;
+        const cadastros = { tomadores: 0, servicos: 0 };
         for await (const d of adn.todos(e.cnpj, nsu)) {
           nsu = d.nsu > nsu ? d.nsu : nsu;
           if (!/NFSE/i.test(d.tipo)) continue;
@@ -57,15 +59,18 @@ export async function POST(req: Request) {
           else {
             novos++;
             try {
-              lerNfse(d.xml); // só confere que serve de modelo; o preenchimento é na tela Nova nota
+              // nota emitida pela empresa alimenta os cadastros de tomadores e serviços (nunca sobrescreve)
+              const a = await aprenderDaNfse(db, { id: e.id, cnpj: e.cnpj }, lerNfse(d.xml), "adn");
+              if (a.tomador === "novo") cadastros.tomadores++;
+              if (a.servico === "novo") cadastros.servicos++;
             } catch {
               /* XML fora do padrão fica guardado, mas não aparece como modelo */
             }
           }
         }
         await db.from("adn_cursor").upsert({ empresa_id: e.id, ultimo_nsu: nsu.toString(), atualizado_em: new Date().toISOString() });
-        await auditar(db, { empresaId: e.id, acao: "consulta_adn", entidade: "empresa", entidadeId: e.id, depois: { ultimo_nsu: nsu.toString(), novos, repetidos } });
-        relatorio.push({ empresa: e.id, novos, repetidos, ultimoNsu: nsu.toString() });
+        await auditar(db, { empresaId: e.id, acao: "consulta_adn", entidade: "empresa", entidadeId: e.id, depois: { ultimo_nsu: nsu.toString(), novos, repetidos, cadastros } });
+        relatorio.push({ empresa: e.id, novos, repetidos, cadastros, ultimoNsu: nsu.toString() });
       } catch (err) {
         relatorio.push({ empresa: e.id, erro: err instanceof Error ? err.message : String(err) });
       }

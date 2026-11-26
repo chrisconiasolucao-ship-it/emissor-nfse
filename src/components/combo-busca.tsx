@@ -8,11 +8,13 @@ export type OpcaoCombo = { valor: string; rotulo: string };
  * Caixa de busca com lista própria (sem <datalist>): clicar numa opção ou usar ↑ ↓ Enter escolhe.
  * Quem usa cuida da busca (onDigitar) e do que fazer com a escolha (onEscolher).
  */
-export function ComboBusca({ texto, opcoes, onDigitar, onEscolher, placeholder, required, invalido }: {
+export function ComboBusca({ texto, opcoes, onDigitar, onEscolher, onAbrir, placeholder, required, invalido }: {
   texto: string;
   opcoes: OpcaoCombo[];
   onDigitar: (v: string) => void;
   onEscolher: (o: OpcaoCombo) => void;
+  /** Chamado ao entrar no campo (ex.: carregar a lista inicial). */
+  onAbrir?: () => void;
   placeholder?: string;
   required?: boolean;
   invalido?: boolean;
@@ -39,7 +41,7 @@ export function ComboBusca({ texto, opcoes, onDigitar, onEscolher, placeholder, 
       <input value={texto} placeholder={placeholder} required={required} autoComplete="off" aria-invalid={invalido}
         role="combobox" aria-expanded={mostrar} aria-controls={id} aria-autocomplete="list"
         onChange={(e) => { onDigitar(e.target.value); setAberto(true); setAtivo(0); }}
-        onFocus={() => setAberto(true)} onBlur={() => setAberto(false)} onKeyDown={tecla} />
+        onFocus={() => { setAberto(true); onAbrir?.(); }} onBlur={() => setAberto(false)} onKeyDown={tecla} />
       {mostrar && (
         <ul id={id} role="listbox" className="combo-lista">
           {opcoes.map((o, i) => (
