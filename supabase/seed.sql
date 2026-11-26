@@ -3,8 +3,8 @@
 
 insert into public.empresa (id, cnpj, razao_social, regime, cod_municipio, serie_dps, inscricao_municipal)
 values
-  ('00000000-0000-4000-8000-00000000000a', '11222333000181', 'EMPRESA A TESTE LTDA', 'ME', '4301602', '90001', '123'),
-  ('00000000-0000-4000-8000-00000000000b', '44555666000102', 'EMPRESA B TESTE LTDA', 'EPP', '4314902', '90001', '456')
+  ('00000000-0000-4000-8000-00000000000a', '11222333000181', 'EMPRESA A TESTE LTDA', 'ME', '4301602', '900', '123'),
+  ('00000000-0000-4000-8000-00000000000b', '44555666000102', 'EMPRESA B TESTE LTDA', 'EPP', '4314902', '900', '456')
 on conflict (id) do nothing;
 
 insert into public.municipio_situacao (cod_ibge, nome, uf, conveniado, ativo_operacional, emissor_nacional)
@@ -40,7 +40,7 @@ insert into public.nota (empresa_id, id, situacao, origem, competencia, tomador_
 values ('00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-0000000000a4', 'autorizada', 'avulsa',
   '2026-11-01', '00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2',
   '010601', '113032000', 'Nota de teste do seed', '4301602', 1350.00, 1350.00, 2.0100, 27.14, 1322.86,
-  '90001', 1, app.montar_id_dps('4301602', '11222333000181', '90001', 1),
+  '900', 1, app.montar_id_dps('4301602', '11222333000181', '900', 1),
   '43016022112223330001810000000000000126110000000001', '1', now(), '00000000-0000-4000-8000-0000000000a3')
 on conflict do nothing;
 

@@ -28,7 +28,8 @@ const empresaSchema = z.object({
   cod_municipio: z.string().regex(/^\d{7}$/, "escolha o município na lista"),
   email: z.string().trim().max(200).optional().transform((v) => v || null),
   telefone: z.string().trim().max(30).optional().transform((v) => v || null),
-  serie_dps: z.string().regex(/^\d{1,5}$/, "série com até 5 dígitos").default("90001"),
+  serie_dps: z.string().regex(/^\d{1,5}$/, "série com até 5 dígitos")
+    .refine((s) => Number(s) >= 1 && Number(s) <= 49999, "série entre 1 e 49999 (faixa de sistema próprio)").default("900"),
 });
 
 export async function salvarEmpresa(_: Estado, form: FormData): Promise<Estado> {

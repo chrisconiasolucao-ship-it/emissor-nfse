@@ -11,7 +11,7 @@ const cert = abrirPfx(readFileSync(resolve(__dirname, "../fixtures/cert-teste.pf
 const { xml } = montarDps({
   ambiente: "restrita",
   emitidaEm: new Date("2026-11-10T12:00:00Z"),
-  serie: "90001",
+  serie: "900",
   numero: 1,
   competencia: "2026-11-01",
   prestador: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3 },

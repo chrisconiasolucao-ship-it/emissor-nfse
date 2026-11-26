@@ -67,7 +67,7 @@ export function CadastroPeloCertificado() {
       <label>Inscrição municipal<input name="inscricao_municipal" /></label>
       <label>E-mail<input name="email" type="email" defaultValue={sug.email ?? ""} /></label>
       <label>Telefone<input name="telefone" defaultValue={sug.telefone ?? ""} /></label>
-      <label>Série da DPS<input name="serie_dps" defaultValue="90001" pattern="\d{1,5}" /></label>
+      <label>Série da DPS<input name="serie_dps" defaultValue="900" pattern="\d{1,5}" /></label>
       {erro && <div className="msg erro largo">{erro}</div>}
       <div className="acoes largo">
         <button type="submit" disabled={pendente}>{pendente ? "Gravando…" : "Gravar empresa e certificado"}</button>

@@ -24,7 +24,7 @@ function validarXsd(xml: string): { ok: boolean; saida: string } {
 const base: DadosDps = {
   ambiente: "restrita",
   emitidaEm: new Date("2026-11-10T12:15:00Z"),
-  serie: "90001",
+  serie: "900",
   numero: 63,
   competencia: "2026-11-01",
   prestador: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3 },
@@ -41,8 +41,8 @@ const base: DadosDps = {
 
 describe("dps-id", () => {
   it("tem 45 posições no formato DPS+cMun+2+CNPJ+série+nDPS", () => {
-    const id = montarIdDps("4301602", "11222333000181", "90001", 63);
-    expect(id).toBe("DPS4301602211222333000181" + "90001" + "000000000000063");
+    const id = montarIdDps("4301602", "11222333000181", "900", 63);
+    expect(id).toBe("DPS4301602211222333000181" + "00900" + "000000000000063");
     expect(id).toHaveLength(45);
   });
 });
@@ -59,6 +59,10 @@ describe("montarDps (AT-004)", () => {
     const v = validarXsd(xml);
     expect(v.saida).not.toMatch(/fails to validate/);
     expect(v.ok).toBe(true);
+  });
+  it("série 90001 é recusada pelo esquema (E1235 na Sefin); 900 passa", () => {
+    expect(validarXsd(montarDps({ ...base, serie: "90001" }).xml).ok).toBe(false);
+    expect(validarXsd(montarDps({ ...base, serie: "900" }).xml).ok).toBe(true);
   });
   it("MEI não informa regApTribSN; ISS retido informa pAliq com 2 casas", () => {
     const { xml } = montarDps({ ...base, prestador: { ...base.prestador, opSimpNac: 2 }, valores: { valorServico: "100", issRetido: true, aliquotaIss: "2,5" } });

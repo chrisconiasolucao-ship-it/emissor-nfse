@@ -96,8 +96,8 @@ export async function cenario(tx: Tx) {
   const chave = (c: string) => `43${c}`.padEnd(50, "0").slice(0, 50);
   await tx.query(
     `insert into nota (empresa_id, id, situacao, tomador_id, descricao, valor_servico, competencia, codigo_tributacao_nacional, cod_municipio_prestacao, chave_acesso, documento_id, serie_dps, numero_dps, id_dps)
-     values ($1,$2,'autorizada',$3,'Serviço A',1350.00,'2026-11-01','010601','4301602',$4,$5,'90001',900001,$6),
-            ($7,$8,'autorizada',$9,'Serviço B',200.00,'2026-11-01','010601','4314902',$10,$11,'90001',900001,$12)`,
+     values ($1,$2,'autorizada',$3,'Serviço A',1350.00,'2026-11-01','010601','4301602',$4,$5,'900',900001,$6),
+            ($7,$8,'autorizada',$9,'Serviço B',200.00,'2026-11-01','010601','4314902',$10,$11,'900',900001,$12)`,
     [A, notaA, tomA, chave(cnpjA), docA, `DPS${cnpjA}A`.slice(0, 45), B, notaB, tomB, chave(cnpjB), docB, `DPS${cnpjB}B`.slice(0, 45)],
   );
   return { A, B, u, tomA, tomB, docA, docB, notaA, notaB, cnpjA, cnpjB };

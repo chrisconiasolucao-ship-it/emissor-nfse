@@ -157,6 +157,8 @@
 			<xs:maxLength value="5"/>
 			<xs:minLength value="1"/>
 			<xs:whiteSpace value="preserve"/>
+			<!-- padrão do esquema v1.01 em uso na Sefin (rejeição E1235 com 90001) -->
+			<xs:pattern value="[0-9]{1,4}|[0-8][0-9]{4}"/>
 		</xs:restriction>
 	</xs:simpleType>
 	<xs:simpleType name="TSEmitenteDPS">

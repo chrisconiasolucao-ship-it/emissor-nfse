@@ -12,7 +12,7 @@ const nfse170 = readFileSync(resolve(__dirname, "../fixtures/nfse-170.xml"), "ut
 const CHAVE = "43016022112223330001810000000000000170260000000001";
 
 function nota(i: number, tentativas = 0, empresaId = "A"): NotaNaFila {
-  return { empresaId, id: `n${i}`, serieDps: "90001", numeroDps: BigInt(i), idDps: montarIdDps("4301602", "11222333000181", "90001", i), tentativas };
+  return { empresaId, id: `n${i}`, serieDps: "900", numeroDps: BigInt(i), idDps: montarIdDps("4301602", "11222333000181", "900", i), tentativas };
 }
 
 function montar(opts: { fila: NotaNaFila[]; sefin?: Partial<ClienteSefin>; abrir?: () => never; municipioAtivo?: boolean }) {

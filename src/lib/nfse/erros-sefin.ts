@@ -10,7 +10,6 @@ export type Classificacao = { tipo: "tecnico" | "dado"; codigo: string; mensagem
 const ORIENTACAO: Record<string, string> = {
   E0008: "Já existe nota para esta DPS (número repetido).",
   E0014: "A DPS informada já foi utilizada.",
-  E1235: "Município não habilitado no Emissor Nacional.",
 };
 
 export class ErroTecnicoSefin extends Error {

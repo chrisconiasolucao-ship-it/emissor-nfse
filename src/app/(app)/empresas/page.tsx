@@ -52,7 +52,7 @@ export default async function Empresas() {
               <label>Inscrição municipal<input name="inscricao_municipal" /></label>
               <label>E-mail<input name="email" type="email" /></label>
               <label>Telefone<input name="telefone" /></label>
-              <label>Série da DPS<input name="serie_dps" defaultValue="90001" pattern="\d{1,5}" /></label>
+              <label>Série da DPS<input name="serie_dps" defaultValue="900" pattern="\d{1,5}" /></label>
             </Formulario>
           </div>
         </>
