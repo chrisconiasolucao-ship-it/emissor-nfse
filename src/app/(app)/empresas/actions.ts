@@ -30,6 +30,11 @@ const empresaSchema = z.object({
   telefone: z.string().trim().max(30).optional().transform((v) => v || null),
   serie_dps: z.string().regex(/^\d{1,5}$/, "série com até 5 dígitos")
     .refine((s) => Number(s) >= 1 && Number(s) <= 49999, "série entre 1 e 49999 (faixa de sistema próprio)").default("900"),
+  // pTotTribSN da DPS (ME/EPP): aceita "6", "6,00" ou "6.00"
+  aliquota_simples: z.string().trim().optional()
+    .transform((v) => (!v ? null : v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
+    .refine((v) => v === null || (/^\d{1,2}(\.\d{1,2})?$/.test(v)), "alíquota do Simples de 0 a 99,99%")
+    .transform((v) => (v === null ? null : Number(v))),
 });
 
 export async function salvarEmpresa(_: Estado, form: FormData): Promise<Estado> {

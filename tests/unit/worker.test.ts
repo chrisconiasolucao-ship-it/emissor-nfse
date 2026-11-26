@@ -36,7 +36,7 @@ function montar(opts: { fila: NotaNaFila[]; sefin?: Partial<ClienteSefin>; abrir
       return i < 0 ? null : fila.splice(i, 1)[0]!;
     },
     carregarContexto: async () => ({
-      empresa: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3 },
+      empresa: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3, aliquotaSimples: "6.00" },
       municipio: { codIbge: "4301602", nome: "Bagé", uf: "RS", ativoOperacional: opts.municipioAtivo ?? true, emissorNacional: true },
       competencia: "2026-11-01",
       dados: {
@@ -125,6 +125,20 @@ describe("worker de emissão", () => {
     const r = await rodarFila(p, 50_000);
     expect(r[0]).toMatchObject({ resultado: "rejeitada", codigo: "MUNICIPIO_INATIVO" });
     expect(log.some((l) => l.startsWith("uso_cert"))).toBe(false);
+  });
+  it("ME sem alíquota do Simples rejeita (CADASTRO) sem abrir o certificado nem enviar (E0712)", async () => {
+    const { p, log } = montar({ fila: [nota(1)] });
+    const ctx = p.carregarContexto;
+    p.carregarContexto = async (n) => { const c = await ctx(n); return { ...c, empresa: { ...c.empresa, aliquotaSimples: null } }; };
+    const r = await rodarFila(p, 50_000);
+    expect(r[0]).toMatchObject({ resultado: "rejeitada", codigo: "CADASTRO" });
+    expect(log.some((l) => l.startsWith("uso_cert"))).toBe(false);
+  });
+  it("DPS de ME enviada leva pTotTribSN", async () => {
+    let enviada = "";
+    const { p } = montar({ fila: [nota(1)], sefin: { emitir: async (x) => { enviada = x; return { tipo: "autorizada", chaveAcesso: CHAVE, nfseXml: nfse170, alertas: [] }; } } });
+    await rodarFila(p, 50_000);
+    expect(enviada).toContain("<pTotTribSN>6.00</pTotTribSN>");
   });
   it("substituição: DPS leva subst e, autorizada, registra o evento na nota antiga", async () => {
     let enviada = "";

@@ -53,6 +53,7 @@ export default async function Empresas() {
               <label>E-mail<input name="email" type="email" /></label>
               <label>Telefone<input name="telefone" /></label>
               <label>Série da DPS<input name="serie_dps" defaultValue="900" pattern="\d{1,5}" /></label>
+              <label>Alíquota do Simples (%)<input name="aliquota_simples" inputMode="decimal" placeholder="ex.: 6,00" defaultValue="" /><span className="suave">ME/EPP: vai na nota como percentual aproximado de tributos.</span></label>
             </Formulario>
           </div>
         </>

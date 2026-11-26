@@ -22,6 +22,7 @@ export type DadosDps = {
     cnpj: string;
     codMunicipio: string;
     opSimpNac: 2 | 3;
+    aliquotaSimples?: string | null; // pTotTribSN (%), obrigatória para ME/EPP
     inscricaoMunicipal?: string | null;
     telefone?: string | null;
     email?: string | null;
@@ -58,6 +59,21 @@ function aliquotaXml(a: string): string {
   return lerValor(a).toFixed(2);
 }
 
+/**
+ * totTrib: ME/EPP informa pTotTribSN (E0712 recusa indTotTrib para ME/EPP); MEI informa indTotTrib = 0.
+ */
+export function totalTributos(p: DadosDps["prestador"]): string {
+  if (p.opSimpNac === 2) return el("indTotTrib", "0");
+  if (p.aliquotaSimples === null || p.aliquotaSimples === undefined || p.aliquotaSimples === "") {
+    throw new ErroCadastroDps("ME/EPP precisa da alíquota do Simples Nacional (%) no cadastro da empresa para emitir.");
+  }
+  const v = lerValor(p.aliquotaSimples);
+  if (v.lessThan(0) || v.greaterThanOrEqualTo(100) || v.decimalPlaces() > 2) throw new ErroCadastroDps("alíquota do Simples precisa ser de 0 a 99,99%");
+  return el("pTotTribSN", lerValor(p.aliquotaSimples).toFixed(2));
+}
+
+export class ErroCadastroDps extends Error {}
+
 export function montarDps(d: DadosDps): { xml: string; idDps: string } {
   const idDps = montarIdDps(d.prestador.codMunicipio, d.prestador.cnpj, d.serie, d.numero);
   const vServ = dinheiro(d.valores.valorServico);
@@ -66,6 +82,7 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
     throw new Error("descrição do serviço precisa ter de 1 a 2000 caracteres");
   }
   if (d.valores.issRetido && !d.valores.aliquotaIss) throw new Error("ISS retido exige alíquota");
+  const totTrib = totalTributos(d.prestador);
 
   const t = d.tomador;
   const endToma = t.endereco
@@ -138,7 +155,7 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
     grupo(
       "valores",
       grupo("vServPrest", el("vServ", vServ)) +
-        grupo("trib", grupo("tribMun", tribMun) + grupo("totTrib", el("indTotTrib", "0"))),
+        grupo("trib", grupo("tribMun", tribMun) + grupo("totTrib", totTrib)),
     );
 
   const xml = `<DPS xmlns="${NS_NFSE}" versao="${VERSAO_DPS}"><infDPS Id="${esc(idDps)}">${infDps}</infDPS></DPS>`;

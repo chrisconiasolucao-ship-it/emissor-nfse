@@ -27,7 +27,7 @@ const base: DadosDps = {
   serie: "900",
   numero: 63,
   competencia: "2026-11-01",
-  prestador: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3 },
+  prestador: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3, aliquotaSimples: "6.00" },
   tomador: {
     tipoDocumento: "CPF",
     documento: "529.982.247-25",
@@ -63,6 +63,13 @@ describe("montarDps (AT-004)", () => {
   it("série 90001 é recusada pelo esquema (E1235 na Sefin); 900 passa", () => {
     expect(validarXsd(montarDps({ ...base, serie: "90001" }).xml).ok).toBe(false);
     expect(validarXsd(montarDps({ ...base, serie: "900" }).xml).ok).toBe(true);
+  });
+  it("ME informa pTotTribSN (E0712); MEI informa indTotTrib; ME sem alíquota não monta", () => {
+    expect(montarDps(base).xml).toContain("<totTrib><pTotTribSN>6.00</pTotTribSN></totTrib>");
+    const mei = montarDps({ ...base, prestador: { ...base.prestador, opSimpNac: 2, aliquotaSimples: null } }).xml;
+    expect(mei).toContain("<totTrib><indTotTrib>0</indTotTrib></totTrib>");
+    expect(validarXsd(mei).ok).toBe(true);
+    expect(() => montarDps({ ...base, prestador: { ...base.prestador, aliquotaSimples: null } })).toThrow(/alíquota do Simples/);
   });
   it("MEI não informa regApTribSN; ISS retido informa pAliq com 2 casas", () => {
     const { xml } = montarDps({ ...base, prestador: { ...base.prestador, opSimpNac: 2 }, valores: { valorServico: "100", issRetido: true, aliquotaIss: "2,5" } });

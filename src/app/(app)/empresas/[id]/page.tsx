@@ -50,6 +50,7 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
             <label>E-mail<input name="email" defaultValue={e.email ?? ""} /></label>
             <label>Telefone<input name="telefone" defaultValue={e.telefone ?? ""} /></label>
             <label>Série da DPS<input name="serie_dps" defaultValue={e.serie_dps} /></label>
+            <label>Alíquota do Simples (%)<input name="aliquota_simples" inputMode="decimal" placeholder="ex.: 6,00" defaultValue={e.aliquota_simples ?? ""} /><span className="suave">ME/EPP: vai na nota como percentual aproximado de tributos.</span></label>
           </Formulario>
         ) : (
           <p>{e.cnpj} · {e.regime} · município {e.cod_municipio}</p>

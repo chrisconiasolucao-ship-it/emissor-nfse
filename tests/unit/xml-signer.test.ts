@@ -16,7 +16,7 @@ const { xml } = montarDps({
   serie: "900",
   numero: 1,
   competencia: "2026-11-01",
-  prestador: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3 },
+  prestador: { cnpj: "11222333000181", codMunicipio: "4301602", opSimpNac: 3, aliquotaSimples: "6.00" },
   tomador: { tipoDocumento: "CPF", documento: "52998224725", nome: "MARIA DE TESTE" },
   servico: { codMunicipioPrestacao: "4301602", codigoTributacaoNacional: "010601", descricao: "Serviço" },
   valores: { valorServico: "10.00", issRetido: false },

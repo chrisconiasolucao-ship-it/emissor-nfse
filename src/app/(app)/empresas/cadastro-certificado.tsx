@@ -68,6 +68,7 @@ export function CadastroPeloCertificado() {
       <label>E-mail<input name="email" type="email" defaultValue={sug.email ?? ""} /></label>
       <label>Telefone<input name="telefone" defaultValue={sug.telefone ?? ""} /></label>
       <label>Série da DPS<input name="serie_dps" defaultValue="900" pattern="\d{1,5}" /></label>
+      <label>Alíquota do Simples (%)<input name="aliquota_simples" inputMode="decimal" placeholder="ex.: 6,00" defaultValue="" /><span className="suave">ME/EPP: vai na nota como percentual aproximado de tributos.</span></label>
       {erro && <div className="msg erro largo">{erro}</div>}
       <div className="acoes largo">
         <button type="submit" disabled={pendente}>{pendente ? "Gravando…" : "Gravar empresa e certificado"}</button>
