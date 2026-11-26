@@ -23,7 +23,7 @@ on conflict do nothing;
 insert into public.servico (empresa_id, id, codigo_tributacao_nacional, codigo_nbs, descricao, aliquota_iss)
 values
   ('00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-0000000000a2', '010601', '113032000', 'Assessoria e consultoria em informática', 2.0100),
-  ('00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-0000000000b2', '170201', '113032000', 'Assessoria contábil', 3.0000)
+  ('00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-0000000000b2', '171901', '113032000', 'Assessoria contábil', 3.0000)
 on conflict do nothing;
 
 -- Uma nota autorizada da empresa A com XML guardado (G01, G08, G10).

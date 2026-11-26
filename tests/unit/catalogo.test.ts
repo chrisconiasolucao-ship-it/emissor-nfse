@@ -17,8 +17,8 @@ describe("tabelas de referência (cTribNac, NBS, correlação)", () => {
     const itens = new Set(catalogo.servicos.flatMap(([c]) => itensDoCodigo(c)));
     expect([...new Set(catalogo.correlacao.filter(([i]) => !itens.has(i)).map(([i]) => i))].sort()).toEqual(["990201", "990301", "990401"]);
   });
-  it("contabilidade (170201) tem NBS correlacionada", () => {
-    const itens = itensDoCodigo("170201");
+  it("contabilidade (171901) tem NBS correlacionada", () => {
+    const itens = itensDoCodigo("171901");
     expect(catalogo.correlacao.some(([i]) => itens.includes(i))).toBe(true);
   });
 });
