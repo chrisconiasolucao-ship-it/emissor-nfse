@@ -8,3 +8,7 @@ next-env.d.ts
 supabase/.temp/
 *.pfx
 !tests/fixtures/cert-teste*.pfx
+
+# impeccable (skill de design): binário baixado e config local de cada pessoa
+.claude/skills/impeccable/scripts/bin/
+.impeccable/config.local.json
