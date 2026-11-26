@@ -1,4 +1,5 @@
 import { CertificadoVencido, SenhaCertificadoInvalida, type CertificadoAberto } from "@/lib/crypto/pfx";
+import { gerarDanfse, type NomeMunicipio } from "@/lib/nfse/danfse";
 import { ErroCadastroDps, montarDps, totalTributos, type DadosDps } from "@/lib/nfse/dps-builder";
 import { ErroTecnicoSefin } from "@/lib/nfse/erros-sefin";
 import { lerNfse } from "@/lib/nfse/nfse-parser";
@@ -36,7 +37,6 @@ export type ClienteSefin = {
   consultarDps(idDps: string): Promise<string | null>;
   emitir(dpsAssinada: string): Promise<ResultadoEmissao>;
   baixarNfse(chave: string): Promise<string>;
-  baixarDanfse(chave: string): Promise<Buffer>;
 };
 
 export type Portas = {
@@ -57,6 +57,8 @@ export type Portas = {
   registrarUsoCertificado(n: NotaNaFila, cert: CertificadoAberto): Promise<void>;
   auditar(n: NotaNaFila, acao: string, depois: Record<string, unknown>): Promise<void>;
   registrarSubstituicao(n: NotaNaFila, s: NonNullable<ContextoNota["substitui"]>): Promise<void>;
+  /** Nome "Município / UF" pelo código IBGE, para o DANFSe. */
+  nomeMunicipio?: NomeMunicipio;
 };
 
 export class SemCertificado extends Error {
@@ -140,11 +142,12 @@ export async function processarNota(p: Portas, n: NotaNaFila): Promise<Resultado
       nfseXml = r.nfseXml;
     }
 
-    // 5. autorizada: guarda XML e DANFSe; DANFSe que falhar é baixado depois
+    // 5. autorizada: guarda XML e DANFSe. O DANFSe é gerado aqui a partir do XML (NT 008; a API oficial foi
+    //    suspensa em 03/08/2026). Se falhar, a nota segue autorizada e o worker de DANFSe gera depois.
     const xmlDoc = await p.guardarDocumento(n, "xml_autorizado", Buffer.from(nfseXml!, "utf8"), "application/xml");
     let danfseDoc: string | null = null;
     try {
-      danfseDoc = await p.guardarDocumento(n, "danfse", await sefin.baixarDanfse(chave), "application/pdf");
+      danfseDoc = await p.guardarDocumento(n, "danfse", await gerarDanfse(nfseXml!, { nomeMunicipio: p.nomeMunicipio }), "application/pdf");
     } catch {
       danfseDoc = null;
     }

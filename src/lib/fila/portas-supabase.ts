@@ -134,6 +134,11 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
       return new SefinClient(c.SEFIN_BASE_URL, transporteHttps(agenteMtls(cert.pfx, cert.senha)));
     },
 
+    async nomeMunicipio(cod) {
+      const { data } = await db.from("municipio_situacao").select("nome, uf").eq("cod_ibge", cod).maybeSingle();
+      return data ? `${String(data.nome)} / ${String(data.uf)}` : null;
+    },
+
     async guardarDocumento(n, tipo, conteudo, contentType) {
       const hash = createHash("sha256").update(conteudo).digest("hex");
       const ext = tipo === "danfse" ? "pdf" : "xml";

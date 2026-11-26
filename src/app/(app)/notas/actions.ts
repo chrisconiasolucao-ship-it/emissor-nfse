@@ -8,11 +8,12 @@ import { auditar, ipDe, logSeguranca } from "@/lib/auditoria/audit";
 import { eEscritorio, exigir, podeCancelarOuSubstituir, podeEmitir } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
-import { abrirCertificadoDaEmpresa } from "@/lib/fila/portas-supabase";
+import { abrirCertificadoDaEmpresa, portasSupabase } from "@/lib/fila/portas-supabase";
 import { mensagemDuplicidade, parecidas, type NotaComparavel } from "@/lib/importacao/duplicidade";
 import { lerPlanilha, PlanilhaGrandeDemais, PlanilhaInvalida, sha256, type LinhaNota } from "@/lib/importacao/planilha";
 import { competenciaAtual, repetirMes } from "@/lib/importacao/repetir-mes";
 import { dinheiro, lerValor } from "@/lib/money";
+import { gerarDanfse } from "@/lib/nfse/danfse";
 import { montarPedidoCancelamento, type CodigoCancelamento } from "@/lib/nfse/evento-builder";
 import { SefinClient, agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
 import { assinarXml } from "@/lib/nfse/xml-signer";
@@ -208,7 +209,7 @@ export async function cancelarNota(_: Estado, form: FormData): Promise<Estado> {
   if (!podeCancelarOuSubstituir(perfil, d.empresa_id)) return { erro: "Só o escritório ou o administrador da empresa pode cancelar nota." };
   const c = config();
   const db = await supabaseServidor();
-  const { data: nota } = await db.from("nota").select("chave_acesso, situacao, empresa:empresa_id(cnpj)").eq("empresa_id", d.empresa_id).eq("id", d.id).single();
+  const { data: nota } = await db.from("nota").select("chave_acesso, situacao, documento_id, empresa:empresa_id(cnpj)").eq("empresa_id", d.empresa_id).eq("id", d.id).single();
   if (!nota || nota.situacao !== "autorizada" || !nota.chave_acesso) return { erro: "Só nota autorizada pode ser cancelada." };
 
   const admin = supabaseAdmin();
@@ -247,6 +248,18 @@ export async function cancelarNota(_: Estado, form: FormData): Promise<Estado> {
     p_ip: ip,
   });
   if (error) return { erro: `Cancelado na Receita, mas o sistema não registrou: ${error.message}. Avise o escritório.` };
+  // DANFSe com a marca CANCELADA (NT 008, item 2.5.1); se falhar, a nota continua cancelada e o PDF anterior fica
+  try {
+    const { data: xmlDoc } = await admin.from("documento").select("storage_path").eq("empresa_id", d.empresa_id).eq("id", nota.documento_id).single();
+    const arq = xmlDoc ? await admin.storage.from("documentos").download(String(xmlDoc.storage_path)) : null;
+    if (arq?.data) {
+      const portas = portasSupabase(admin, "cancelamento");
+      const pdf = await gerarDanfse(await arq.data.text(), { nomeMunicipio: portas.nomeMunicipio, situacao: "cancelada" });
+      await portas.guardarDocumento({ empresaId: d.empresa_id, id: d.id } as never, "danfse", pdf, "application/pdf");
+    }
+  } catch (e) {
+    console.error(JSON.stringify({ acao: "danfse_cancelada", nota: d.id, erro: e instanceof Error ? e.message : String(e) }));
+  }
   revalidatePath(`/notas/${d.id}`);
   return { ok: true, mensagem: "Nota cancelada." };
 }

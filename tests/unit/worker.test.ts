@@ -24,7 +24,6 @@ function montar(opts: { fila: NotaNaFila[]; sefin?: Partial<ClienteSefin>; abrir
     consultarDps: async () => null,
     emitir: async () => ({ tipo: "autorizada", chaveAcesso: CHAVE, nfseXml: nfse170, alertas: [] }),
     baixarNfse: async () => nfse170,
-    baixarDanfse: async () => Buffer.from("%PDF-1.4"),
     ...opts.sefin,
   };
   const p: Portas = {

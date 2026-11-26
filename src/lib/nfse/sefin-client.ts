@@ -11,7 +11,6 @@ export const CAMINHOS = {
   emitir: "/nfse",
   consultarDps: (idDps: string) => `/dps/${encodeURIComponent(idDps)}`,
   nfse: (chave: string) => `/nfse/${encodeURIComponent(chave)}`,
-  danfse: (chave: string) => `/danfse/${encodeURIComponent(chave)}`,
   eventos: (chave: string) => `/nfse/${encodeURIComponent(chave)}/eventos`,
 };
 
@@ -123,13 +122,6 @@ export class SefinClient {
     const b64 = campo(json(r), "nfseXmlGZipB64");
     if (!b64) throw new ErroTecnicoSefin("resposta sem XML da NFS-e", r.status);
     return gunzipB64(b64);
-  }
-
-  /** DANFSe oficial em PDF (Key Decision 6 do brainstorm). */
-  async baixarDanfse(chave: string): Promise<Buffer> {
-    const r = await this.chamar("GET", CAMINHOS.danfse(chave));
-    if (r.status < 200 || r.status >= 300 || !r.contentType.includes("pdf")) this.falhaTecnica(r);
-    return r.corpo;
   }
 
   async registrarEvento(chave: string, pedidoAssinado: string): Promise<ResultadoEvento> {
