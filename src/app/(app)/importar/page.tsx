@@ -89,7 +89,7 @@ export default async function Importar() {
       </section>
 
       <section className="cartao lista-cadastro" aria-labelledby="t-recentes">
-        <div className="cartao-cab busca-linha" style={{ margin: 0 }}><h3 id="t-recentes" style={{ margin: 0 }}>Últimas notas guardadas</h3><span className="suave dir">do ADN e de XML enviado</span></div>
+        <div className="cartao-cab busca-linha" style={{ margin: 0 }}><h3 id="t-recentes" style={{ margin: 0 }}>Últimas notas guardadas</h3><span className="suave dir">do ADN e de XML enviado · <Link href="/notas?situacao=importada&tipo=todas&de=&ate=">Ver todas em Notas</Link></span></div>
         {docs.length === 0 ? <p className="suave" style={{ padding: 16, margin: 0 }}>Nenhuma nota guardada ainda. Use “Buscar agora”.</p> : (
           <div className="tabela sem-borda">
             <table>

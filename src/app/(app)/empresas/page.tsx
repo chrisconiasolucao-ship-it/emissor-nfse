@@ -5,6 +5,7 @@ import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { competenciaAtual } from "@/lib/importacao/repetir-mes";
 import { reais, somar } from "@/lib/money";
+import { semDuplicadas } from "@/lib/notas/importadas";
 import { documento } from "@/lib/formato";
 import { supabaseServidor } from "@/lib/supabase/server";
 
@@ -32,11 +33,14 @@ export default async function Empresas() {
   const atual = competenciaAtual();
   const meses = seisMeses(atual);
   const db = await supabaseServidor();
-  const [{ data: todas }, { data: notas }, { data: rejeitadas }, { data: avisos, count: totalAvisos }] = await Promise.all([
+  const [{ data: todas }, { data: notas }, { data: rejeitadas }, { data: avisos, count: totalAvisos }, { data: importadas }, { data: numeros }] = await Promise.all([
     db.from("empresa").select("id, razao_social, cnpj, regime, pausada, motivo_pausa, ativa").order("razao_social"),
     db.from("nota").select("empresa_id, situacao, valor_servico, competencia").gte("competencia", meses[0]!).limit(10000),
     db.from("nota").select("id, empresa_id, motivo_rejeicao, empresa:empresa_id(razao_social), tomador:tomador(nome)").eq("situacao", "rejeitada").order("criado_em", { ascending: false }).limit(5),
     db.from("aviso").select("id, mensagem, nota_id, empresa:empresa_id(razao_social)", { count: "exact" }).is("lido_em", null).order("quando", { ascending: false }).limit(4),
+    // prestadas importadas (ADN ou XML) também entram no faturamento, sem repetir as emitidas aqui
+    db.from("documento").select("empresa_id, numero_nfse, competencia, valor").eq("tipo", "xml_origem").eq("papel", "prestada").gte("competencia", meses[0]!).limit(10000),
+    db.from("nota").select("empresa_id, numero_nfse").not("numero_nfse", "is", null).limit(10000),
   ]);
 
   const ativas = (todas ?? []).filter((e) => e.ativa);
@@ -58,6 +62,13 @@ export default async function Empresas() {
       if (n.valor_servico != null) { c.valorMes.push(String(n.valor_servico)); total.valor.push(String(n.valor_servico)); }
     } else if (n.situacao === "na_fila" || n.situacao === "enviando") { c.fila++; total.fila++; }
     else if (n.situacao === "rejeitada") { c.rejeitada++; total.rejeitada++; }
+  }
+  for (const d of semDuplicadas(importadas ?? [], numeros ?? [])) {
+    if (d.valor == null || !d.competencia) continue;
+    const c: Conta = conta.get(d.empresa_id) ?? { autorizada: 0, fila: 0, rejeitada: 0, valorMes: [], porMes: new Map<string, string[]>() };
+    conta.set(d.empresa_id, c);
+    c.porMes.set(d.competencia, [...(c.porMes.get(d.competencia) ?? []), String(d.valor)]);
+    if (d.competencia === atual) { c.valorMes.push(String(d.valor)); total.valor.push(String(d.valor)); }
   }
   const linhas = ativas.map((e) => {
     const c = conta.get(e.id);
@@ -100,10 +111,10 @@ export default async function Empresas() {
         <Link className="indicador" href={`/notas?todas=1&situacao=autorizada&competencia=${atual.slice(0, 7)}`}>
           <span className="rot">Autorizadas</span><span className="val">{total.autorizada}</span><span className="sub">neste mês</span>
         </Link>
-        <Link className="indicador fila" href="/notas?todas=1&situacao=na_fila">
+        <Link className="indicador fila" href="/notas?todas=1&situacao=na_fila&de=&ate=">
           <span className="rot">Na fila ou enviando</span><span className="val">{total.fila}</span><span className="sub">a Receita responde em minutos</span>
         </Link>
-        <Link className="indicador erro" href="/notas?todas=1&situacao=rejeitada">
+        <Link className="indicador erro" href="/notas?todas=1&situacao=rejeitada&de=&ate=">
           <span className="rot">Rejeitadas</span><span className="val">{total.rejeitada}</span><span className="sub">{total.rejeitada ? "precisam de correção" : "nenhuma pendente"}</span>
         </Link>
       </div>
