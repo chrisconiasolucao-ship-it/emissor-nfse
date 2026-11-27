@@ -27,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/tomadores", rotulo: "Tomadores (clientes)" },
     { href: "/servicos", rotulo: "Serviços" },
     { href: "/importar", rotulo: "Importar" },
+    { href: "/baixar", rotulo: "Baixar em lote" },
   ];
   // Escritório sem empresa aberta: painel inicial e as telas do escritório. Com empresa aberta: só as telas dela,
   // a troca rápida no topo e a volta ao painel inicial (que fecha a empresa).

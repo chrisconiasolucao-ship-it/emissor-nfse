@@ -124,7 +124,7 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
           <h1>Notas</h1>
           <p>{nomeEmpresa ?? "Todas as empresas"} · {textoPeriodo} · {linhas.length} {linhas.length === 1 ? "nota" : "notas"}</p>
         </div>
-        <div className="acoes"><Link className="botao" href={daAberta ? "/notas/nova" : f.empresa ? `/api/empresa-atual?id=${f.empresa}&para=/notas/nova` : "/empresas"}>+ Nova nota</Link></div>
+        <div className="acoes">{daAberta && <Link className="botao secundario" href={`/baixar?de=${de ?? ""}&ate=${ate ?? ""}&tipo=${tipo === "tomada" ? "tomadas" : tipo === "todas" ? "ambas" : "prestadas"}`}>Baixar em lote</Link>}<Link className="botao" href={daAberta ? "/notas/nova" : f.empresa ? `/api/empresa-atual?id=${f.empresa}&para=/notas/nova` : "/empresas"}>+ Nova nota</Link></div>
       </div>
 
       {(naFila ?? 0) > 0 && <AcompanharNota texto={`${naFila} ${naFila === 1 ? "nota na fila ou enviando" : "notas na fila ou enviando"} para a Receita. A lista atualiza sozinha.`} />}
