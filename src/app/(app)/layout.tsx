@@ -41,13 +41,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           { titulo: "Escritório", itens: [
             { href: "/empresas", rotulo: "Painel inicial" },
             { href: "/empresas/gerenciar", rotulo: "Gerenciar empresas" },
-            { href: "/notas?todas=1", rotulo: "Notas de todas as empresas" },
             { href: "/avisos", rotulo: "Avisos" },
             { href: "/municipios", rotulo: "Municípios" },
           ] },
         ];
   const lista = escritorio && empresa
-    ? ((await (await supabaseServidor()).from("empresa").select("id, razao_social").eq("ativa", true).order("razao_social")).data ?? [])
+    ? ((await (await supabaseServidor()).from("empresa").select("id, razao_social, cnpj, regime").eq("ativa", true).order("razao_social")).data ?? [])
     : [];
   const nome = perfil.nome ?? perfil.email ?? "";
   return (
@@ -67,7 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <span className="suave">Trabalhando em</span>
               <strong title={empresa.razao_social}>{empresa.razao_social}</strong>
               <span className="suave">{documento(empresa.cnpj)}{empresa.pausada ? " · pausada" : ""}</span>
-              <TrocarEmpresa atual={empresa.id} empresas={lista.map((x) => ({ id: x.id, nome: x.razao_social }))} />
+              <TrocarEmpresa atual={empresa.id} empresas={lista.map((x) => ({ id: x.id, nome: x.razao_social, cnpj: x.cnpj, detalhe: `${documento(x.cnpj)} · ${x.regime}` }))} />
             </div>
           ) : (
             <div className="aberta vazia"><span>Nenhuma empresa aberta.</span><span className="suave">Abra uma no Painel inicial para ver painel, notas, tomadores e serviços dela.</span></div>
