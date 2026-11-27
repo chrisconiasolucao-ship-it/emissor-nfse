@@ -10,6 +10,7 @@ import { config } from "@/lib/config";
 import { arquivosDaNota, baixarConferido, baseUrl, dadosDaNota, lerNotaParaEnvio, segredoDoLink } from "@/lib/envio/arquivos";
 import { criarToken } from "@/lib/envio/link";
 import { lerEmails, montarEmail, remetente, telefoneWhatsApp } from "@/lib/envio/mensagens";
+import { enviarPeloResend } from "@/lib/envio/resend";
 import { enviarPorSmtp, FalhaNoEnvio } from "@/lib/envio/smtp";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
@@ -29,7 +30,7 @@ async function completarTomador(notaId: string, empresaId: string, campo: "email
   await admin.from("tomador").update({ [campo]: valor }).eq("empresa_id", empresaId).eq("id", n.tomador_id).is(campo, null);
 }
 
-/** Envia o DANFSe e o XML por e-mail pelo Gmail do escritório (SMTP). */
+/** Envia o DANFSe e o XML por e-mail: pelo Resend com o domínio próprio, se configurado; senão pelo Gmail do escritório (SMTP). */
 export async function enviarNotaPorEmail(_: Estado, form: FormData): Promise<Estado> {
   const p = emailSchema.safeParse(Object.fromEntries(form));
   if (!p.success) return { erro: "Dados do envio inválidos." };
@@ -43,8 +44,10 @@ export async function enviarNotaPorEmail(_: Estado, form: FormData): Promise<Est
   if ("erro" in lidos) return { erro: lidos.erro };
 
   const c = config();
-  if (!c.SMTP_USUARIO || !c.SMTP_SENHA) {
-    return { erro: "O envio por e-mail ainda não foi configurado: falta cadastrar SMTP_USUARIO e SMTP_SENHA (senha de app do Gmail) na Vercel." };
+  const resend = c.RESEND_API_KEY && c.EMAIL_REMETENTE ? { chave: c.RESEND_API_KEY, de: c.EMAIL_REMETENTE } : null;
+  const smtp = c.SMTP_USUARIO && c.SMTP_SENHA ? { host: c.SMTP_HOST, porta: c.SMTP_PORTA, usuario: c.SMTP_USUARIO, senha: c.SMTP_SENHA } : null;
+  if (!resend && !smtp) {
+    return { erro: "O envio por e-mail ainda não foi configurado: cadastre na Vercel RESEND_API_KEY e EMAIL_REMETENTE (domínio próprio) ou SMTP_USUARIO e SMTP_SENHA (Gmail)." };
   }
 
   const admin = supabaseAdmin();
@@ -63,10 +66,10 @@ export async function enviarNotaPorEmail(_: Estado, form: FormData): Promise<Est
       arquivos.map(async (a) => ({ nome: a.nome, conteudo: await baixarConferido(admin, a), tipo: a.tipo === "danfse" ? "application/pdf" : "application/xml" })),
     );
     const { assunto, html, texto } = montarEmail(dadosDaNota(nota), p.data.mensagem, links);
-    const id = await enviarPorSmtp(
-      { host: c.SMTP_HOST, porta: c.SMTP_PORTA, usuario: c.SMTP_USUARIO, senha: c.SMTP_SENHA },
-      { de: remetente(nota.empresa.razao_social, c.SMTP_USUARIO), para: lidos.emails, responderPara: nota.empresa.email || c.EMAIL_ESCRITORIO || null, assunto, html, texto, anexos },
-    );
+    const pedido = { para: lidos.emails, responderPara: nota.empresa.email || c.EMAIL_ESCRITORIO || smtp?.usuario || null, assunto, html, texto, anexos };
+    const id = resend
+      ? await enviarPeloResend(resend.chave, { ...pedido, de: remetente(nota.empresa.razao_social, resend.de) })
+      : await enviarPorSmtp(smtp!, { ...pedido, de: remetente(nota.empresa.razao_social, smtp!.usuario) });
     await registrar("enviado", { provedor_id: id || undefined });
   } catch (e) {
     const msg = e instanceof FalhaNoEnvio ? e.message : `O e-mail não foi enviado: ${(e as Error).message}`;

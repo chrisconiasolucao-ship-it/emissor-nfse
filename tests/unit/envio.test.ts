@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { enviarPeloResend, traduzirResend } from "@/lib/envio/resend";
 import { criarToken, eRobo, lerToken } from "@/lib/envio/link";
 import { lerEmails, linkWhatsApp, montarEmail, remetente, telefoneWhatsApp, textoWhatsApp } from "@/lib/envio/mensagens";
 import { enviarPorSmtp, FalhaNoEnvio, traduzir } from "@/lib/envio/smtp";
@@ -121,5 +122,28 @@ describe("e-mail", () => {
     await expect(falha).rejects.toBeInstanceOf(FalhaNoEnvio);
     await expect(falha).rejects.toThrow(/senha de app/);
     expect(traduzir({ message: "Daily user sending limit exceeded" })).toMatch(/limite diário/);
+  });
+});
+
+describe("Resend (domínio próprio)", () => {
+  const pedido = { de: '"EMPRESA" <notas@dominio.com.br>', para: ["t@t.com"], responderPara: "emp@e.com", assunto: "s", html: "h", texto: "t", anexos: [{ nome: "a.pdf", conteudo: Buffer.from("pdf"), tipo: "application/pdf" }] };
+  it("manda remetente, resposta e anexos em base64", async () => {
+    let corpo: Record<string, unknown> = {};
+    let auth = "";
+    const f = (async (_u: string, init: RequestInit) => {
+      corpo = JSON.parse(String(init.body));
+      auth = (init.headers as Record<string, string>).Authorization!;
+      return new Response(JSON.stringify({ id: "re_1" }), { status: 200 });
+    }) as unknown as typeof fetch;
+    expect(await enviarPeloResend("re_chave", pedido, f)).toBe("re_1");
+    expect(auth).toBe("Bearer re_chave");
+    expect(corpo.from).toBe('"EMPRESA" <notas@dominio.com.br>');
+    expect(corpo.reply_to).toBe("emp@e.com");
+    expect((corpo.attachments as { content: string }[])[0]!.content).toBe(Buffer.from("pdf").toString("base64"));
+  });
+  it("domínio não verificado vira mensagem clara", async () => {
+    const f = (async () => new Response(JSON.stringify({ name: "validation_error", message: "The dominio.com.br domain is not verified." }), { status: 403 })) as unknown as typeof fetch;
+    await expect(enviarPeloResend("k", pedido, f)).rejects.toThrow(/não foi verificado/);
+    expect(traduzirResend(401, "")).toMatch(/RESEND_API_KEY/);
   });
 });
