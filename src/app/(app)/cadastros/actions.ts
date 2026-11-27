@@ -57,7 +57,8 @@ export async function salvarTomador(_: Estado, form: FormData): Promise<Estado> 
   const { error } = await q;
   if (error?.code === "23505") return { erro: "Já existe um tomador com este CPF/CNPJ nesta empresa." };
   if (error) return { erro: error.message };
-  revalidatePath("/cadastros");
+  revalidatePath("/tomadores");
+  revalidatePath("/servicos");
   return { ok: true, mensagem: id ? "Tomador atualizado." : "Tomador cadastrado." };
 }
 
@@ -70,7 +71,8 @@ export async function excluirTomador(_: Estado, form: FormData): Promise<Estado>
   // tomador com nota fica: a nota guarda a referência (chave estrangeira)
   if (error?.code === "23503") return { erro: "Este tomador já tem notas e não pode ser excluído. Você pode editar os dados dele." };
   if (error) return { erro: error.message };
-  revalidatePath("/cadastros");
+  revalidatePath("/tomadores");
+  revalidatePath("/servicos");
   return { ok: true, mensagem: "Tomador excluído." };
 }
 
@@ -115,7 +117,8 @@ export async function salvarServico(_: Estado, form: FormData): Promise<Estado> 
       return { erro: e instanceof Error ? e.message : String(e) };
     }
   }
-  revalidatePath("/cadastros");
+  revalidatePath("/tomadores");
+  revalidatePath("/servicos");
   return { ok: true, mensagem: id ? "Serviço atualizado." : "Serviço cadastrado." };
 }
 
@@ -128,7 +131,8 @@ export async function arquivarServico(_: Estado, form: FormData): Promise<Estado
   const db = await supabaseServidor();
   const { error } = await db.from("servico").update({ ativo }).eq("empresa_id", empresaId).eq("id", String(form.get("id")));
   if (error) return { erro: error.message };
-  revalidatePath("/cadastros");
+  revalidatePath("/tomadores");
+  revalidatePath("/servicos");
   return { ok: true, mensagem: ativo ? "Serviço reativado." : "Serviço arquivado." };
 }
 

@@ -5,6 +5,7 @@ import { CamposServico } from "@/components/campos-servico";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
+import { empresaAtual } from "@/lib/empresa-atual";
 import { competenciaAtual } from "@/lib/importacao/repetir-mes";
 import { lerNfse, type ModeloNota } from "@/lib/nfse/nfse-parser";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -18,7 +19,10 @@ type Valores = Partial<Record<string, string>>;
 /** Nota avulsa, a partir de nota anterior (?modelo=<nota>), de XML importado (?documento=<doc>) ou substituição (?substitui=<nota>). */
 export default async function NovaNota({ searchParams }: { searchParams: Promise<{ empresa?: string; modelo?: string; documento?: string; substitui?: string; editar?: string; tomador?: string; servico?: string; tdoc?: string; tnome?: string; scod?: string; sdesc?: string }> }) {
   const perfil = await perfilAtual();
-  const p = await searchParams;
+  const busca = await searchParams;
+  // a empresa aberta no menu já é o passo 1
+  const aberta = await empresaAtual(perfil);
+  const p = { ...busca, empresa: busca.empresa ?? aberta?.id };
   const db = await supabaseServidor();
   const { data: empresas } = await db.from("empresa").select("id, razao_social, cnpj, regime, cod_municipio").eq("ativa", true).order("razao_social");
   const empresaPadrao = p.empresa ?? (eEscritorio(perfil) ? undefined : (perfil.empresaId ?? undefined));
@@ -163,7 +167,7 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
       <div className="cab">
         <div>
           <h1>{titulo}</h1>
-          <p>{travado ? "Os dados vêm da nota de origem. Confira e ajuste antes de emitir." : "Escolha a empresa, depois o tomador e o serviço. Clique na lista ou digite para buscar."}</p>
+          <p>{travado ? "Os dados vêm da nota de origem. Confira e ajuste antes de emitir." : `${aberta ? "Escolha" : "Escolha a empresa, depois"} o tomador e o serviço. Clique na lista ou digite para buscar.`}</p>
         </div>
       </div>
       <div className="duas">
@@ -175,7 +179,7 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
               empresa={emp ? { titulo: emp.razao_social, detalhe: `CNPJ ${documento(emp.cnpj)} · ${emp.regime}` } : null}
               tomador={tomadorEsc}
               servico={servicoEsc}
-              trocarEmpresa={eEscritorio(perfil) || (empresas ?? []).length > 1}
+              trocarEmpresa={!aberta && (eEscritorio(perfil) || (empresas ?? []).length > 1)}
               travado={travado}
             />
           </Suspense>

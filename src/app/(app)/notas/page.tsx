@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
+import { empresaAtual } from "@/lib/empresa-atual";
 import { reais } from "@/lib/money";
 import { documento } from "@/lib/formato";
 import { supabaseServidor } from "@/lib/supabase/server";
@@ -7,10 +9,11 @@ import { supabaseServidor } from "@/lib/supabase/server";
 const ROTULO: Record<string, string> = { rascunho: "Rascunho", na_fila: "Na fila", enviando: "Enviando", autorizada: "Autorizada", rejeitada: "Rejeitada", cancelada: "Cancelada", substituida: "Substituída" };
 const FILTROS: [string, string][] = [["", "Todas"], ["autorizada", "Autorizadas"], ["na_fila", "Na fila"], ["rejeitada", "Rejeitadas"], ["rascunho", "Rascunhos"], ["cancelada", "Canceladas"]];
 
-type Filtro = { empresa?: string; situacao?: string; competencia?: string };
+type Filtro = { empresa?: string; situacao?: string; competencia?: string; todas?: string };
 
 function link(f: Filtro, situacao: string): string {
   const u = new URLSearchParams();
+  if (f.todas) u.set("todas", "1");
   if (f.empresa) u.set("empresa", f.empresa);
   if (f.competencia) u.set("competencia", f.competencia);
   if (situacao) u.set("situacao", situacao);
@@ -19,8 +22,12 @@ function link(f: Filtro, situacao: string): string {
 }
 
 export default async function Notas({ searchParams }: { searchParams: Promise<Filtro> }) {
-  await perfilAtual();
-  const f = await searchParams;
+  const perfil = await perfilAtual();
+  const busca = await searchParams;
+  // Com uma empresa aberta, a tela mostra só as notas dela; "todas=1" (menu do escritório) mostra todas.
+  const aberta = await empresaAtual(perfil);
+  const daAberta = Boolean(aberta) && !(eEscritorio(perfil) && busca.todas);
+  const f: Filtro = daAberta ? { ...busca, empresa: aberta!.id, todas: undefined } : busca;
   const db = await supabaseServidor();
   let q = db
     .from("nota")
@@ -39,7 +46,7 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
           <h1>Notas</h1>
           <p>{nomeEmpresa ?? "Todas as empresas"}{f.competencia ? ` · competência ${f.competencia.slice(5, 7)}/${f.competencia.slice(0, 4)}` : ""} · {(data ?? []).length} {(data ?? []).length === 1 ? "nota" : "notas"}</p>
         </div>
-        <div className="acoes"><Link className="botao" href={f.empresa ? `/notas/nova?empresa=${f.empresa}` : "/notas/nova"}>+ Nova nota</Link></div>
+        <div className="acoes"><Link className="botao" href={daAberta ? "/notas/nova" : f.empresa ? `/api/empresa-atual?id=${f.empresa}&para=/notas/nova` : "/empresas"}>+ Nova nota</Link></div>
       </div>
 
       <nav className="filtros" aria-label="Situação">
@@ -48,14 +55,15 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
         ))}
       </nav>
 
-      <form className="grade cartao" method="get" style={{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr) auto", alignItems: "end" }}>
+      <form className="grade cartao" method="get" style={{ gridTemplateColumns: daAberta ? "minmax(0, 1fr) auto" : "minmax(0, 2fr) minmax(0, 1fr) auto", alignItems: "end" }}>
         {f.situacao && <input type="hidden" name="situacao" value={f.situacao} />}
-        <label>Empresa
+        {f.todas && <input type="hidden" name="todas" value="1" />}
+        {!daAberta && <label>Empresa
           <select name="empresa" defaultValue={f.empresa ?? ""}>
             <option value="">Todas</option>
             {(empresas ?? []).map((e) => <option key={e.id} value={e.id}>{e.razao_social}</option>)}
           </select>
-        </label>
+        </label>}
         <label>Competência<input type="month" name="competencia" defaultValue={f.competencia ?? ""} /></label>
         <div className="acoes"><button type="submit" className="secundario">Filtrar</button></div>
       </form>
@@ -63,7 +71,7 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
       {(data ?? []).length > 0 ? (
         <div className="tabela">
           <table>
-            <thead><tr><th>Situação</th><th>Tomador</th><th>Empresa</th><th>Competência</th><th className="num">Valor</th><th>Nº NFS-e</th><th><span className="so-leitor">Ações</span></th></tr></thead>
+            <thead><tr><th>Situação</th><th>Tomador</th>{!daAberta && <th>Empresa</th>}<th>Competência</th><th className="num">Valor</th><th>Nº NFS-e</th><th><span className="so-leitor">Ações</span></th></tr></thead>
             <tbody>
               {(data ?? []).map((n) => {
                 const t = n.tomador as unknown as { nome: string; documento: string } | null;
@@ -74,13 +82,13 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
                       <strong>{t?.nome ?? "—"}</strong>
                       {n.motivo_rejeicao ? <span className="suave" style={{ color: "var(--erro)" }}>{n.motivo_rejeicao}</span> : t?.documento && <span className="suave">{documento(t.documento)}</span>}
                     </td>
-                    <td className="suave">{(n.empresa as unknown as { razao_social: string } | null)?.razao_social}</td>
+                    {!daAberta && <td className="suave">{(n.empresa as unknown as { razao_social: string } | null)?.razao_social}</td>}
                     <td>{n.competencia ? `${n.competencia.slice(5, 7)}/${n.competencia.slice(0, 4)}` : "—"}</td>
                     <td className="num"><b>{reais(n.valor_servico)}</b></td>
                     <td className="num">{n.numero_nfse ?? "—"}</td>
                     <td className="num">
                       {n.situacao === "rejeitada" || n.situacao === "rascunho"
-                        ? <Link className="botao mini" href={`/notas/nova?editar=${n.id}`}>{n.situacao === "rejeitada" ? "Corrigir" : "Continuar"}</Link>
+                        ? <Link className="botao mini" href={daAberta ? `/notas/nova?editar=${n.id}` : `/api/empresa-atual?id=${n.empresa_id}&para=${encodeURIComponent(`/notas/nova?editar=${n.id}`)}`}>{n.situacao === "rejeitada" ? "Corrigir" : "Continuar"}</Link>
                         : <Link className="botao mini secundario" href={`/notas/${n.id}`}>Abrir</Link>}
                     </td>
                   </tr>
@@ -90,7 +98,7 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
           </table>
         </div>
       ) : (
-        <div className="cartao suave">Nenhuma nota com estes filtros. <Link href="/notas">Ver todas</Link> ou <Link href="/notas/nova">emitir uma nota</Link>.</div>
+        <div className="cartao suave">Nenhuma nota com estes filtros. <Link href={link({ todas: f.todas, empresa: daAberta ? undefined : f.empresa }, "")}>Tirar os filtros</Link>{daAberta && <> ou <Link href="/notas/nova">emitir uma nota</Link></>}.</div>
       )}
     </>
   );

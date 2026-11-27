@@ -44,7 +44,7 @@ h3 { font-size: 15px; font-weight: 600; margin: 0; }
 .faixa { padding: 5px 16px; color: #fff; font-weight: 600; font-size: 12.5px; letter-spacing: .04em; text-align: center; }
 .faixa.restrita { background: var(--faixa-restrita); } .faixa.producao { background: var(--faixa-producao); }
 .casca { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 29px); }
-.menu { background: var(--grafite); color: var(--grafite-texto); display: flex; flex-direction: column; gap: 22px; padding: 18px 12px; position: sticky; top: 0; height: calc(100vh - 29px); }
+.menu { background: var(--grafite); color: var(--grafite-texto); display: flex; flex-direction: column; gap: 16px; padding: 18px 12px; overflow-y: auto; position: sticky; top: 0; height: calc(100vh - 29px); }
 .marca { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; padding: 0 6px; }
 .marca:hover { color: #fff; }
 .marca img { width: 38px; height: 38px; flex: none; }
@@ -54,6 +54,15 @@ h3 { font-size: 15px; font-weight: 600; margin: 0; }
 .menu nav a { color: var(--grafite-texto); text-decoration: none; padding: 9px 12px; border-radius: var(--raio-p); font-weight: 500; transition: background .15s ease-out, color .15s ease-out; }
 .menu nav a:hover { background: var(--grafite-2); color: #fff; }
 .menu nav a[aria-current="page"] { background: var(--primaria); color: #fff; }
+.menu nav { gap: 14px; }
+.menu-grupo { display: flex; flex-direction: column; gap: 2px; }
+.menu-titulo { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--grafite-suave); padding: 0 12px 4px; }
+.menu .aberta { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--raio-p); background: var(--grafite-2); font-size: 12.5px; min-width: 0; }
+.menu .aberta strong { color: #fff; font-size: 13.5px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.menu .aberta .suave { color: var(--grafite-suave); }
+.menu .aberta a { color: #9cc3ff; font-weight: 600; margin-top: 4px; text-decoration: none; }
+.menu .aberta a:hover { color: #fff; text-decoration: underline; }
+.menu .aberta.vazia { background: transparent; border: 1px dashed var(--grafite-2); color: var(--grafite-texto); }
 .menu .quem { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 0 6px; font-size: 12.5px; color: var(--grafite-suave); }
 .menu .quem i { font-style: normal; flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--grafite-2); color: #fff; font-weight: 700; font-size: 11.5px; }
 .menu .quem span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -87,13 +96,13 @@ a.indicador:hover { border-color: var(--borda-forte); color: inherit; }
 
 /* ---------- Cartões de empresa (assinatura: barras de 6 meses, mês atual em azul) ---------- */
 .empresas { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
-.empresa { display: grid; gap: 14px; align-content: start; }
+.empresa { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }
 .empresa-topo { display: flex; gap: 12px; align-items: center; min-width: 0; }
 .empresa-topo > div { min-width: 0; }
 .empresa-topo strong { display: block; line-height: 1.3; }
 .empresa-topo a { color: var(--texto); text-decoration: none; } .empresa-topo a:hover { color: var(--primaria); }
 .sigla { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; font-weight: 700; font-size: 14px; color: #fff; background: var(--grafite-2); letter-spacing: .02em; }
-.contagens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.contagens { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .contagens a, .contagens div { background: var(--fundo); border-radius: var(--raio-p); padding: 8px 10px; color: inherit; text-decoration: none; }
 .contagens a:hover { background: var(--primaria-clara); }
 .contagens b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
@@ -104,10 +113,24 @@ a.indicador:hover { border-color: var(--borda-forte); color: inherit; }
 .barras i { flex: 1; min-height: 3px; border-radius: 3px 3px 1px 1px; background: var(--barra); }
 .barras i:last-child { background: var(--primaria); }
 .barras-rot { display: flex; justify-content: space-between; font-size: 11px; color: var(--suave); }
-.empresa-pe { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--borda); padding-top: 12px; }
+.empresa-pe { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-top: 1px solid var(--borda); padding-top: 12px; min-width: 0; }
+.empresa-pe .selo { white-space: normal; min-width: 0; }
+.empresa-pe .acoes { flex-wrap: nowrap; flex: none; }
 .empresa-pe b { font-variant-numeric: tabular-nums; }
 
 /* listas dentro de cartão (precisa de atenção, avisos) */
+.historico.grande .barras { height: 150px; gap: 10px; }
+.barras-meses { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; font-size: 12px; color: var(--suave); }
+.barras-meses span { display: grid; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barras-meses b { color: var(--texto); font-weight: 600; text-transform: capitalize; }
+.atalhos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; }
+.atalhos a { display: grid; gap: 2px; padding: 12px; border-radius: var(--raio-p); background: var(--primaria-clara); color: var(--primaria-escura); text-decoration: none; }
+.atalhos a:hover { background: #d6e5fb; }
+.atalhos b { font-size: 22px; line-height: 1.1; }
+.atalhos span { font-size: 12.5px; font-weight: 600; }
+.zona-perigo { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; border-color: #f1c9c5; }
+.zona-perigo p { margin: 4px 0 12px; }
+@media (max-width: 760px) { .zona-perigo { grid-template-columns: 1fr; } }
 .lista { display: grid; }
 .lista > * { display: flex; gap: 10px; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--borda); }
 .lista > *:first-child { border-top: 0; padding-top: 0; }

@@ -1,6 +1,7 @@
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
+import { empresaAtual } from "@/lib/empresa-atual";
 import { competenciaAtual } from "@/lib/importacao/repetir-mes";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { buscarNoAdn, importarPlanilha, importarXmlModelo, repetirMesAnterior } from "../notas/actions";
@@ -22,7 +23,7 @@ export default async function Importar() {
   const db = await supabaseServidor();
   const { data: empresas } = await db.from("empresa").select("id, razao_social").eq("ativa", true).order("razao_social");
   const { data: modelos } = await db.from("documento").select("id, empresa_id, nome_original, criado_em").eq("tipo", "xml_origem").order("criado_em", { ascending: false }).limit(30);
-  const padrao = eEscritorio(perfil) ? null : perfil.empresaId;
+  const padrao = (await empresaAtual(perfil))?.id ?? (eEscritorio(perfil) ? null : perfil.empresaId);
   const lista = empresas ?? [];
   return (
     <>
