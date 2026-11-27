@@ -42,6 +42,7 @@ export default async function NovaEmpresa() {
           <label>Telefone<input name="telefone" /></label>
           <label>Série da DPS<input name="serie_dps" defaultValue="900" pattern="\d{1,5}" /></label>
           <label>Alíquota do Simples (%)<input name="aliquota_simples" inputMode="decimal" placeholder="ex.: 6,00" defaultValue="" /><span className="suave">ME/EPP: vai na nota como percentual aproximado de tributos.</span></label>
+            <label>Regime do ISS<select name="regime_iss" defaultValue="normal"><option value="normal">Normal (ISS pela alíquota, no DAS ou retido)</option><option value="sociedade_profissionais">ISS fixo · sociedade de profissionais</option></select><span className="suave">ISS fixo: a nota sai sem alíquota e sem ISS retido.</span></label>
         </Formulario>
       </div>
             </>

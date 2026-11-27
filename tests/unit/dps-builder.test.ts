@@ -89,3 +89,42 @@ describe("montarDps (AT-004)", () => {
     expect(() => montarDps({ ...base, valores: { valorServico: "10", issRetido: true, aliquotaIss: "10" } })).toThrow();
   });
 });
+
+describe("ISS fixo e retenções (27/11/2026)", () => {
+  it("ISS fixo (sociedade de profissionais) vai com regEspTrib 6, ISS por fora do SN e sem pAliq", () => {
+    const { xml } = montarDps({ ...base, prestador: { ...base.prestador, regimeIss: "sociedade_profissionais" } });
+    expect(xml).toContain("<regApTribSN>2</regApTribSN><regEspTrib>6</regEspTrib>");
+    expect(xml).toContain("<tribISSQN>1</tribISSQN><tpRetISSQN>1</tpRetISSQN></tribMun>");
+    expect(validarXsd(xml).ok).toBe(true);
+  });
+  it("ISS fixo com ISS retido não monta", () => {
+    expect(() =>
+      montarDps({ ...base, prestador: { ...base.prestador, regimeIss: "sociedade_profissionais" }, valores: { valorServico: "100", issRetido: true, aliquotaIss: "2" } }),
+    ).toThrow(/ISS fixo/);
+  });
+  it("sem retenção não há grupo tribFed", () => {
+    expect(montarDps(base).xml).not.toContain("tribFed");
+  });
+  it("INSS, IRRF, CSLL, PIS e COFINS retidos geram tribFed válido no XSD", () => {
+    const { xml } = montarDps({
+      ...base,
+      valores: { valorServico: "1.000,00", issRetido: false, retencoes: { inss: "11", irrf: "1.5", csll: "1", pis: "0.65", cofins: "3" } },
+    });
+    expect(xml).toContain(
+      "<tribFed><piscofins><CST>00</CST><vBCPisCofins>1000.00</vBCPisCofins><pAliqPis>0.65</pAliqPis><pAliqCofins>3.00</pAliqCofins>" +
+        "<vPis>6.50</vPis><vCofins>30.00</vCofins><tpRetPisCofins>3</tpRetPisCofins></piscofins>" +
+        "<vRetCP>110.00</vRetCP><vRetIRRF>15.00</vRetIRRF><vRetCSLL>10.00</vRetCSLL></tribFed><totTrib>",
+    );
+    const v = validarXsd(xml);
+    expect(v.saida).not.toMatch(/fails to validate/);
+    expect(v.ok).toBe(true);
+  });
+  it("só INSS: tribFed sem piscofins; só CSLL: tpRetPisCofins 8", () => {
+    const inss = montarDps({ ...base, valores: { valorServico: "500", issRetido: false, retencoes: { inss: "11" } } }).xml;
+    expect(inss).toContain("<tribFed><vRetCP>55.00</vRetCP></tribFed>");
+    expect(validarXsd(inss).ok).toBe(true);
+    const csll = montarDps({ ...base, valores: { valorServico: "500", issRetido: false, retencoes: { csll: "1" } } }).xml;
+    expect(csll).toContain("<piscofins><CST>00</CST><tpRetPisCofins>8</tpRetPisCofins></piscofins><vRetCSLL>5.00</vRetCSLL>");
+    expect(validarXsd(csll).ok).toBe(true);
+  });
+});

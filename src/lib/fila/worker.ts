@@ -23,7 +23,7 @@ export type NotaNaFila = {
 };
 
 export type ContextoNota = {
-  empresa: { cnpj: string; codMunicipio: string; opSimpNac: 2 | 3; inscricaoMunicipal?: string | null; aliquotaSimples?: string | null };
+  empresa: { cnpj: string; codMunicipio: string; opSimpNac: 2 | 3; inscricaoMunicipal?: string | null; aliquotaSimples?: string | null; regimeIss?: "normal" | "sociedade_profissionais" | null };
   municipio: SituacaoMunicipio | null;
   competencia: string;
   dados: Omit<DadosDps, "ambiente" | "emitidaEm" | "serie" | "numero" | "competencia" | "prestador">;
@@ -86,6 +86,9 @@ export async function processarNota(p: Portas, n: NotaNaFila): Promise<Resultado
   // cadastro incompleto para a DPS (ex.: ME/EPP sem alíquota do Simples): rejeita sem usar o certificado
   try {
     totalTributos({ cnpj: ctx.empresa.cnpj, codMunicipio: ctx.empresa.codMunicipio, opSimpNac: ctx.empresa.opSimpNac, aliquotaSimples: ctx.empresa.aliquotaSimples });
+    if (ctx.empresa.regimeIss === "sociedade_profissionais" && ctx.dados.valores.issRetido) {
+      throw new ErroCadastroDps("Empresa com ISS fixo (sociedade de profissionais) não tem ISS retido pelo tomador. Desmarque o ISS retido e emita de novo.");
+    }
   } catch (e) {
     if (!(e instanceof ErroCadastroDps)) throw e;
     await p.marcarRejeitada(n, "CADASTRO", e.message);
@@ -115,7 +118,7 @@ export async function processarNota(p: Portas, n: NotaNaFila): Promise<Resultado
     numero: n.numeroDps,
     competencia: ctx.competencia,
     substituicao: ctx.substitui ? { chaveSubstituida: ctx.substitui.chave, codigoMotivo: ctx.substitui.codigoMotivo, motivo: ctx.substitui.motivo } : null,
-    prestador: { cnpj: ctx.empresa.cnpj, codMunicipio: ctx.empresa.codMunicipio, opSimpNac: ctx.empresa.opSimpNac, inscricaoMunicipal: ctx.empresa.inscricaoMunicipal, aliquotaSimples: ctx.empresa.aliquotaSimples },
+    prestador: { cnpj: ctx.empresa.cnpj, codMunicipio: ctx.empresa.codMunicipio, opSimpNac: ctx.empresa.opSimpNac, inscricaoMunicipal: ctx.empresa.inscricaoMunicipal, aliquotaSimples: ctx.empresa.aliquotaSimples, regimeIss: ctx.empresa.regimeIss ?? "normal" },
   });
   if (idDps !== n.idDps) throw new Error(`id da DPS montado (${idDps}) difere do numerado no banco (${n.idDps})`);
   const assinada = assinarXml(xml, "infDPS", cert.aberto.chavePrivadaPem, cert.aberto.certificadoPem);

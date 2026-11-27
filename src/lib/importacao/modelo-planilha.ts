@@ -22,6 +22,11 @@ export const COLUNAS = [
   { chave: "competencia", titulo: "Competência (MM/AAAA)", obrigatoria: true, exemplo: "11/2026" },
   { chave: "iss_retido", titulo: "ISS retido pelo tomador (S/N)", obrigatoria: false, exemplo: "N" },
   { chave: "aliquota_iss", titulo: "Alíquota do ISS (%) se retido", obrigatoria: false, exemplo: "" },
+  { chave: "ret_inss", titulo: "INSS retido (%), ex.: 11", obrigatoria: false, exemplo: "" },
+  { chave: "ret_irrf", titulo: "IRRF retido (%), ex.: 1,5", obrigatoria: false, exemplo: "" },
+  { chave: "ret_csll", titulo: "CSLL retida (%), ex.: 1", obrigatoria: false, exemplo: "" },
+  { chave: "ret_pis", titulo: "PIS retido (%), ex.: 0,65", obrigatoria: false, exemplo: "" },
+  { chave: "ret_cofins", titulo: "COFINS retida (%), ex.: 3", obrigatoria: false, exemplo: "" },
 ] as const;
 
 export type ChaveColuna = (typeof COLUNAS)[number]["chave"];

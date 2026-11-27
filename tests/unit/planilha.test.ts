@@ -74,3 +74,18 @@ describe("duplicidade (AT-022) e repetir mês (AT-020)", () => {
     expect(r).toEqual([expect.objectContaining({ competencia: "2026-12-01", origem: "repeticao", notaModeloId: "n1", valorServico: "10.00" })]);
   });
 });
+
+describe("planilha: retenções federais (27/11/2026)", () => {
+  it("lê ret_inss/ret_irrf/ret_csll/ret_pis/ret_cofins; vazio é sem retenção; inválido vira erro da linha", async () => {
+    const csv = [
+      CAB + ";ret_inss;ret_irrf;ret_csll;ret_pis;ret_cofins",
+      "CPF;52998224725;FULANO;010601;Serviço;1000;11/2026;N;;11;1,5;1;0,65;3",
+      "CPF;52998224725;FULANO;010601;Serviço;1000;11/2026;N;;;;;;",
+      "CPF;52998224725;FULANO;010601;Serviço;1000;11/2026;N;;150;;;;",
+    ].join("\n");
+    const r = await lerPlanilha(Buffer.from(csv), "ret.csv");
+    expect(r.linhas[0]!.retencoes).toEqual({ inss: "11.00", irrf: "1.50", csll: "1.00", pis: "0.65", cofins: "3.00" });
+    expect(r.linhas[1]!.retencoes).toEqual({ inss: null, irrf: null, csll: null, pis: null, cofins: null });
+    expect(r.erros).toEqual([expect.objectContaining({ linha: 4, campo: "ret_inss" })]);
+  });
+});
