@@ -20,12 +20,18 @@ export type ArquivoNota = { id: string; tipo: "danfse" | "xml_autorizado"; stora
 
 /** Nota com empresa e tomador, lida com o cliente dado (sessão do usuário = RLS decide; admin = já conferido). */
 export async function lerNotaParaEnvio(db: SupabaseClient, id: string): Promise<NotaParaEnvio | null> {
-  const { data } = await db
+  return (await lerNotaComErro(db, id)).nota;
+}
+
+/** Igual a lerNotaParaEnvio, mas devolve também o erro do banco, para a tela mostrar o motivo. */
+export async function lerNotaComErro(db: SupabaseClient, id: string): Promise<{ nota: NotaParaEnvio | null; erro: string | null }> {
+  const { data, error } = await db
     .from("nota")
     .select("id, empresa_id, situacao, numero_nfse, valor_servico, competencia, documento_id, empresa:empresa_id(razao_social, email), tomador:tomador(nome, email, telefone)")
     .eq("id", id)
     .maybeSingle();
-  return (data as unknown as NotaParaEnvio) ?? null;
+  if (error) console.error("lerNotaParaEnvio", id, error);
+  return { nota: (data as unknown as NotaParaEnvio) ?? null, erro: error ? `${error.code ?? ""} ${error.message}`.trim() : null };
 }
 
 export function dadosDaNota(n: NotaParaEnvio): DadosNota {
