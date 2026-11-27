@@ -63,6 +63,22 @@ export function abrirPfx(pfx: Buffer, senha: string): CertificadoAberto {
   };
 }
 
+/**
+ * Chave e cadeia em PEM para o TLS (mTLS da Sefin/ADN). O Node (OpenSSL 3) recusa pfx com criptografia antiga
+ * (RC2/3DES, comum em A1 de várias certificadoras): "Unsupported PKCS12 PFX data". O node-forge lê esses
+ * arquivos, então o TLS recebe chave e certificados já abertos, com o certificado da empresa primeiro.
+ */
+export function pemsParaTls(pfx: Buffer, senha: string): { key: string; cert: string } {
+  const aberto = abrirPfx(pfx, senha);
+  const asn1 = forge.asn1.fromDer(forge.util.createBuffer(pfx.toString("binary")));
+  const p12 = forge.pkcs12.pkcs12FromAsn1(asn1, false, senha);
+  const OID_CERT = forge.pki.oids.certBag as string;
+  const cadeia = (p12.getBags({ bagType: OID_CERT })[OID_CERT] ?? [])
+    .map((b) => (b.cert ? forge.pki.certificateToPem(b.cert) : null))
+    .filter((pem): pem is string => !!pem && pem !== aberto.certificadoPem);
+  return { key: aberto.chavePrivadaPem, cert: [aberto.certificadoPem, ...cadeia].join("") };
+}
+
 /** AT-007: certificado vencido não assina; o worker pausa a empresa. */
 export function exigirValido(c: CertificadoAberto, agora = new Date()): CertificadoAberto {
   if (c.validoAte.getTime() <= agora.getTime()) throw new CertificadoVencido(c.validoAte);
