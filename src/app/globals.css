@@ -266,3 +266,34 @@ td.num, th.num { white-space: nowrap; }
 @media (max-width: 760px) { .casca { background: none; } }
 a.cartao.empresa:hover { border-color: var(--primaria); }
 main > h2 { margin-top: 10px; }
+
+/* ---------- Janela (cadastro de tomador/serviço) ---------- */
+.janela-fundo { position: fixed; inset: 0; z-index: 50; background: rgb(15 20 26 / .45); display: grid; place-items: start center; padding: 6vh 16px; overflow-y: auto; animation: aparece .12s ease-out; }
+.janela { background: var(--cartao); border-radius: 14px; width: min(760px, 100%); padding: 22px 24px; box-shadow: 0 24px 60px rgb(15 20 26 / .28); display: grid; gap: 14px; }
+.janela-cab { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.janela-cab h2 { margin: 0; }
+.janela-x { font-size: 26px; line-height: 1; color: var(--suave); text-decoration: none; padding: 0 6px; border-radius: 6px; }
+.janela-x:hover { background: var(--fundo); color: var(--texto); }
+.janela-pe { border-top: 1px solid var(--borda); padding-top: 12px; }
+@keyframes aparece { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .janela-fundo { animation: none; } }
+
+/* ---------- Lista de cadastros e escolha de empresa ---------- */
+.lista-cadastro { padding: 0; overflow: hidden; }
+.busca-linha { display: flex; gap: 8px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--borda); flex-wrap: wrap; }
+.busca-linha input[name="q"] { flex: 1; min-width: 220px; }
+.busca-linha .dir { margin-left: auto; }
+.tabela.sem-borda { border: 0; border-radius: 0; }
+.nome-link { color: var(--texto); font-weight: 600; text-decoration: none; }
+.nome-link:hover { color: var(--primaria); text-decoration: underline; }
+td.nowrap { white-space: nowrap; }
+td > .suave { display: block; font-size: 12.5px; }
+.rodape-lista { margin: 0; padding: 12px 16px; border-top: 1px solid var(--borda); font-size: 12.5px; }
+.abrir-empresa { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.abrir-empresa h2 { margin: 0; }
+.barras.mini { display: inline-flex; width: 84px; height: 26px; gap: 3px; vertical-align: middle; }
+.resumo-empresas td.num a { color: inherit; text-decoration: none; font-variant-numeric: tabular-nums; }
+.resumo-empresas td.num a:hover { color: var(--primaria); text-decoration: underline; }
+.resumo-empresas td.tem-erro a { color: var(--erro); font-weight: 700; }
+.abrir-empresa .escolha-lista { max-height: 232px; }
+.resumo-empresas td:first-child { min-width: 240px; }

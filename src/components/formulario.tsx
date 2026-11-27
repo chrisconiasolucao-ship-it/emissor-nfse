@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import type { Estado } from "@/app/(app)/notas/actions";
 
 /** Formulário com Server Action e retorno de mensagem (erro, sucesso, confirmação de duplicidade). */
@@ -9,13 +10,18 @@ export function Formulario({
   children,
   className,
   botao,
+  aoConcluir,
 }: {
   acao: (e: Estado, f: FormData) => Promise<Estado>;
   children: React.ReactNode;
   className?: string;
   botao?: React.ReactNode;
+  /** Para onde ir quando a ação der certo (ex.: fechar a janela de cadastro e voltar à lista). */
+  aoConcluir?: string;
 }) {
   const [estado, enviar, pendente] = useActionState(acao, {});
+  const router = useRouter();
+  useEffect(() => { if (estado.ok && aoConcluir) { router.replace(aoConcluir, { scroll: false }); router.refresh(); } }, [estado, aoConcluir, router]);
   return (
     <form action={enviar} className={className}>
       {children}
