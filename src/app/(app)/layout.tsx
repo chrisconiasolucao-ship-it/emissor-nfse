@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { ItensMenu, type GrupoMenu } from "@/components/menu-lateral";
+import { TrocarEmpresa } from "@/components/trocar-empresa";
+import { supabaseServidor } from "@/lib/supabase/server";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { empresaAtual } from "@/lib/empresa-atual";
@@ -26,14 +28,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/servicos", rotulo: "Serviços" },
     { href: "/importar", rotulo: "Importar" },
   ];
-  // Escritório: primeiro escolhe a empresa na lista; os itens da empresa aparecem quando ela está aberta.
-  const grupos: GrupoMenu[] = escritorio
-    ? [
-        { itens: [{ href: "/empresas", rotulo: "Empresas" }] },
-        ...(empresa ? [{ titulo: "Empresa aberta", itens: [...daEmpresa, { href: `/empresas/${empresa.id}`, rotulo: "Cadastro da empresa" }] }] : []),
-        { titulo: "Escritório", itens: [{ href: "/notas?todas=1", rotulo: "Notas de todas as empresas" }, { href: "/avisos", rotulo: "Avisos" }, { href: "/municipios", rotulo: "Municípios" }] },
-      ]
-    : [{ itens: [...daEmpresa, ...(perfil.papel === "cliente_admin" && perfil.empresaId ? [{ href: `/empresas/${perfil.empresaId}`, rotulo: "Minha empresa" }] : [])] }];
+  // Escritório sem empresa aberta: painel inicial e as telas do escritório. Com empresa aberta: só as telas dela,
+  // a troca rápida no topo e a volta ao painel inicial (que fecha a empresa).
+  const grupos: GrupoMenu[] = !escritorio
+    ? [{ itens: [...daEmpresa, ...(perfil.papel === "cliente_admin" && perfil.empresaId ? [{ href: `/empresas/${perfil.empresaId}`, rotulo: "Minha empresa" }] : [])] }]
+    : empresa
+      ? [
+          { titulo: "Empresa aberta", itens: [...daEmpresa, { href: `/empresas/${empresa.id}`, rotulo: "Cadastro da empresa" }] },
+          { titulo: "Escritório", itens: [{ href: "/api/empresa-atual", rotulo: "Painel inicial", simples: true }] },
+        ]
+      : [
+          { titulo: "Escritório", itens: [
+            { href: "/empresas", rotulo: "Painel inicial" },
+            { href: "/empresas/gerenciar", rotulo: "Gerenciar empresas" },
+            { href: "/notas?todas=1", rotulo: "Notas de todas as empresas" },
+            { href: "/avisos", rotulo: "Avisos" },
+            { href: "/municipios", rotulo: "Municípios" },
+          ] },
+        ];
+  const lista = escritorio && empresa
+    ? ((await (await supabaseServidor()).from("empresa").select("id, razao_social").eq("ativa", true).order("razao_social")).data ?? [])
+    : [];
   const nome = perfil.nome ?? perfil.email ?? "";
   return (
     <>
@@ -52,10 +67,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <span className="suave">Trabalhando em</span>
               <strong title={empresa.razao_social}>{empresa.razao_social}</strong>
               <span className="suave">{documento(empresa.cnpj)}{empresa.pausada ? " · pausada" : ""}</span>
-              <a href="/api/empresa-atual">Trocar de empresa</a>
+              <TrocarEmpresa atual={empresa.id} empresas={lista.map((x) => ({ id: x.id, nome: x.razao_social }))} />
             </div>
           ) : (
-            <div className="aberta vazia"><span>Nenhuma empresa aberta.</span><span className="suave">Abra uma em Empresas para ver painel, notas, tomadores e serviços dela.</span></div>
+            <div className="aberta vazia"><span>Nenhuma empresa aberta.</span><span className="suave">Abra uma no Painel inicial para ver painel, notas, tomadores e serviços dela.</span></div>
           ))}
           <ItensMenu grupos={grupos} />
           <div className="quem"><i aria-hidden="true">{iniciais(nome)}</i><span><b>{nome}</b>{PAPEL[perfil.papel] ?? perfil.papel}</span></div>

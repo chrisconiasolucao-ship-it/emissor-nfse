@@ -321,3 +321,10 @@ td > .suave { display: block; font-size: 12.5px; }
 .outras-importacoes h3, .outras-importacoes p { margin: 0; }
 .outras-importacoes form { display: grid; gap: 10px; }
 @media (max-width: 1100px) { .adn, .outras-importacoes { grid-template-columns: 1fr; } }
+.menu .trocar { display: grid; gap: 4px; margin-top: 8px; font-size: 12px; }
+.menu .trocar select { background: var(--grafite); color: #fff; border: 1px solid #3b4654; border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 13px; width: 100%; }
+.menu .trocar select:focus-visible { outline: 2px solid #9cc3ff; outline-offset: 1px; }
+form.em-linha { display: inline-flex; flex-direction: row-reverse; align-items: center; gap: 6px; }
+form.em-linha .msg { margin: 0; padding: 3px 8px; font-size: 12px; white-space: nowrap; }
+form.em-linha .acoes { width: auto; }
+.busca-linha .filtros { margin-left: auto; }
