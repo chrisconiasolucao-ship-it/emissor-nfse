@@ -179,7 +179,7 @@ export async function TelaCadastros({ aba, p }: { aba: "tomadores" | "servicos";
             <input type="hidden" name="empresa_id" value={empresaId} />
             {edicao && <input type="hidden" name="id" value={s(e.id)} />}
             <label className="largo">Nome curto (para achar na lista)<input name="nome" defaultValue={s(e.nome)} placeholder="ex.: Honorários mensais" maxLength={120} /></label>
-            <CamposServico codigo={s(e.codigo_tributacao_nacional) || undefined} nbs={s(e.codigo_nbs) || undefined} />
+            <CamposServico codigo={s(e.codigo_tributacao_nacional) || undefined} nbs={s(e.codigo_nbs) || undefined} ibscbs={{ cclasstrib: s(e.cclasstrib), cindOp: s(e.cind_op), cativSn: s(e.cativ_sn) }} />
             <label className="largo">Descrição que vai na nota<textarea name="descricao" defaultValue={s(e.descricao)} required maxLength={2000} /></label>
             <label>Município da prestação<CampoMunicipio name="cod_municipio_prestacao" codigo={s(e.cod_municipio_prestacao)} /><span className="suave">Em branco: o da empresa.</span></label>
             <label>Valor sugerido (R$)<input name="valor_padrao" defaultValue={s(e.valor_padrao).replace(".", ",")} inputMode="decimal" /></label>

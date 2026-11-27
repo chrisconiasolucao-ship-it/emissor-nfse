@@ -1,6 +1,7 @@
 import { CertificadoVencido, SenhaCertificadoInvalida, type CertificadoAberto } from "@/lib/crypto/pfx";
 import { gerarDanfse, type NomeMunicipio } from "@/lib/nfse/danfse";
 import { ErroCadastroDps, montarDps, totalTributos, type DadosDps } from "@/lib/nfse/dps-builder";
+import { resolverIbsCbs, type EntradaIbsCbs, type IbsCbsDps, type ModoIbsCbs } from "@/lib/nfse/ibscbs";
 import { ErroTecnicoSefin } from "@/lib/nfse/erros-sefin";
 import { lerNfse } from "@/lib/nfse/nfse-parser";
 import { avaliarRegraMunicipio, type SituacaoMunicipio } from "@/lib/nfse/regra-municipio";
@@ -29,6 +30,8 @@ export type ContextoNota = {
   dados: Omit<DadosDps, "ambiente" | "emitidaEm" | "serie" | "numero" | "competencia" | "prestador">;
   /** nota substituída (a NFS-e nova leva o grupo subst; depois de autorizada, registra o evento) */
   substitui?: { notaId: string; chave: string; codigoMotivo: "01" | "02" | "03" | "04" | "05" | "99"; motivo: string; pedidoPor: string } | null;
+  /** dados para decidir os códigos de IBS/CBS (só usados quando o modo não é "desligado") */
+  ibscbs?: EntradaIbsCbs | null;
 };
 
 export type CertificadoEmUso = { pfx: Buffer; senha: string; aberto: CertificadoAberto };
@@ -43,6 +46,8 @@ export type Portas = {
   agora(): Date;
   ambiente: "restrita" | "producao";
   retryMinutos: number[];
+  /** IBS/CBS do Simples na DPS (NFSE_IBSCBS_SIMPLES); ausente = desligado */
+  modoIbsCbs?: ModoIbsCbs;
   pegarProximaNota(): Promise<NotaNaFila | null>;
   carregarContexto(n: NotaNaFila): Promise<ContextoNota>;
   /** Lança SenhaCertificadoInvalida, CertificadoVencido ou SemCertificado. */
@@ -84,7 +89,9 @@ export async function processarNota(p: Portas, n: NotaNaFila): Promise<Resultado
     return { nota: n.id, resultado: "rejeitada", codigo: regra.codigo, motivo: regra.motivo };
   }
   // cadastro incompleto para a DPS (ex.: ME/EPP sem alíquota do Simples): rejeita sem usar o certificado
+  let ibscbs: IbsCbsDps | null;
   try {
+    ibscbs = resolverIbsCbs(p.modoIbsCbs ?? "desligado", ctx.ibscbs);
     totalTributos({ cnpj: ctx.empresa.cnpj, codMunicipio: ctx.empresa.codMunicipio, opSimpNac: ctx.empresa.opSimpNac, aliquotaSimples: ctx.empresa.aliquotaSimples });
     if (ctx.empresa.regimeIss === "sociedade_profissionais" && ctx.dados.valores.issRetido) {
       throw new ErroCadastroDps("Empresa com ISS fixo (sociedade de profissionais) não tem ISS retido pelo tomador. Desmarque o ISS retido e emita de novo.");
@@ -117,6 +124,7 @@ export async function processarNota(p: Portas, n: NotaNaFila): Promise<Resultado
     serie: n.serieDps,
     numero: n.numeroDps,
     competencia: ctx.competencia,
+    ibscbs,
     substituicao: ctx.substitui ? { chaveSubstituida: ctx.substitui.chave, codigoMotivo: ctx.substitui.codigoMotivo, motivo: ctx.substitui.motivo } : null,
     prestador: { cnpj: ctx.empresa.cnpj, codMunicipio: ctx.empresa.codMunicipio, opSimpNac: ctx.empresa.opSimpNac, inscricaoMunicipal: ctx.empresa.inscricaoMunicipal, aliquotaSimples: ctx.empresa.aliquotaSimples, regimeIss: ctx.empresa.regimeIss ?? "normal" },
   });

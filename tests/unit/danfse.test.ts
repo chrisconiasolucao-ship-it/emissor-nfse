@@ -42,4 +42,15 @@ describe("DANFSe gerado no sistema (NT 008)", () => {
   it("recusa XML que não é NFS-e", async () => {
     await expect(gerarDanfse("<a/>")).rejects.toThrow(/não é uma NFS-e/);
   });
+
+  it("NFS-e do Simples com IBS/CBS (NT 009) mostra receita bruta e os valores do SN", async () => {
+    const comSn = xml
+      .replace("</infNFSe>", "<IBSCBS><valores><vReceitaBrutaSN>1350.00</vReceitaBrutaSN></valores><totCIBS><vTotNF>1350.00</vTotNF><gTribSN><pIBSSN>0.10</pIBSSN><vIBSSN>1.35</vIBSSN><pCBSSN>0.90</pCBSSN><vCBSSN>12.15</vCBSSN></gTribSN></totCIBS></IBSCBS></infNFSe>")
+      .replace("</infDPS>", "<IBSCBS><cIndOp>100301</cIndOp><valores><trib><CST>200</CST><cClassTrib>200052</cClassTrib></trib></valores></IBSCBS></infDPS>");
+    const t = textoDoPdf(await gerarDanfse(comSn));
+    expect(t).toContain("200 / 200052");
+    expect(t).toContain("R$ 12,15");
+    expect(t).toContain("R$ 13,50");
+    expect(t).not.toContain("Sem informação de IBS/CBS");
+  });
 });

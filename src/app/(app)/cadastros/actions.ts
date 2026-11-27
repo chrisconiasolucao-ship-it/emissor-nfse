@@ -111,6 +111,10 @@ const servicoSchema = z
     ret_csll: pctOpc,
     ret_pis: pctOpc,
     ret_cofins: pctOpc,
+    // IBS/CBS (NT 009): vazio = automático pela correlação oficial / atividade da empresa
+    cclasstrib: z.string().trim().optional().transform((v) => v || null).refine((v) => v === null || /^\d{6}$/.test(v), "escolha a classificação na lista"),
+    cind_op: z.string().trim().optional().transform((v) => v || null).refine((v) => v === null || /^\d{6}$/.test(v), "escolha o indicador da operação na lista"),
+    cativ_sn: z.string().trim().optional().transform((v) => v || null).refine((v) => v === null || /^\d{2}$/.test(v), "escolha a atividade do Simples na lista"),
   })
   .refine((d) => !d.iss_retido || !!d.aliquota_iss, { message: "ISS retido exige alíquota", path: ["aliquota_iss"] });
 

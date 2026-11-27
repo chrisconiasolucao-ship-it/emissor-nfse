@@ -1,10 +1,12 @@
 import { dinheiro, lerValor } from "@/lib/money";
 import { montarIdDps } from "./dps-id";
+import type { IbsCbsDps } from "./ibscbs";
 import { lerPercentual, tipoRetPisCofins, valoresRetencao, type PercentuaisRetencao } from "./retencoes";
 import { dataHoraBrasilia, el, esc, grupo } from "./xml";
 
 /**
- * Monta o XML da DPS v1.01 (esquema da produção restrita de 24/11/2026; sem o grupo IBS/CBS, opcional no esquema).
+ * Monta o XML da DPS v1.01 (esquema da produção restrita de 24/11/2026). O grupo IBS/CBS só sai quando `ibscbs`
+ * vem preenchido (ver ./ibscbs.ts; desligado por padrão até o Release 4 da NT 009).
  * Regras aplicadas para emitente = prestador (tpEmit 1): nome e endereço do prestador não são
  * informados (vêm do cadastro nacional). Pontos marcados "validar na restrita" dependem das regras
  * de negócio da Sefin, que os XSDs não mostram.
@@ -51,6 +53,8 @@ export type DadosDps = {
     /** percentuais retidos pelo tomador sobre o valor do serviço */
     retencoes?: PercentuaisRetencao | null;
   };
+  /** IBS/CBS do Simples (NT 009). null/ausente = DPS sem nada de IBS/CBS. */
+  ibscbs?: IbsCbsDps | null;
   substituicao?: { chaveSubstituida: string; codigoMotivo: "01" | "02" | "03" | "04" | "05" | "99"; motivo?: string | null } | null;
 };
 
@@ -78,6 +82,12 @@ export function totalTributos(p: DadosDps["prestador"]): string {
 }
 
 export class ErroCadastroDps extends Error {}
+
+/** Grupo IBSCBS da DPS: indicador da operação e CST/cClassTrib; os valores a Sefin calcula (validar na restrita). */
+export function grupoIbsCbs(i: IbsCbsDps | null | undefined): string {
+  if (!i) return "";
+  return grupo("IBSCBS", el("cIndOp", i.cIndOp) + grupo("valores", grupo("trib", el("CST", i.cst) + el("cClassTrib", i.cClassTrib))));
+}
 
 /** ISS fixo no Simples (ex.: escritório contábil, LC 123 art. 18 §22-A): federais no SN, ISS por fora (validar na restrita). */
 export const REG_AP_TRIB_SN_ISS_FIXO = "2";
@@ -152,6 +162,7 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
     el("opSimpNac", String(d.prestador.opSimpNac)) +
     // ME/EPP: apuração de tributos federais e municipal pelo Simples (validar na restrita)
     (d.prestador.opSimpNac === 3 ? el("regApTribSN", issFixo ? REG_AP_TRIB_SN_ISS_FIXO : "1") : "") +
+    el("regApIBSCBSSN", d.ibscbs?.regApIBSCBSSN ?? null) + // Release 4 da NT 009 (só no modo completo)
     el("regEspTrib", issFixo ? "6" : "0");
 
   const tribMun =
@@ -192,14 +203,15 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
       grupo("locPrest", el("cLocPrestacao", d.servico.codMunicipioPrestacao)) +
         grupo(
           "cServ",
-          el("cTribNac", d.servico.codigoTributacaoNacional) + el("cNBS", d.servico.codigoNbs) + el("xDescServ", d.servico.descricao),
+          el("cTribNac", d.servico.codigoTributacaoNacional) + el("cNBS", d.servico.codigoNbs) + el("cAtvSN", d.ibscbs?.cAtvSN ?? null) + el("xDescServ", d.servico.descricao),
         ),
     ) +
     grupo(
       "valores",
       grupo("vServPrest", el("vServ", vServ)) +
         grupo("trib", grupo("tribMun", tribMun) + tributosFederais(vServ, d.valores.retencoes) + grupo("totTrib", totTrib)),
-    );
+    ) +
+    grupoIbsCbs(d.ibscbs);
 
   const xml = `<DPS xmlns="${NS_NFSE}" versao="${VERSAO_DPS}"><infDPS Id="${esc(idDps)}">${infDps}</infDPS></DPS>`;
   return { xml, idDps };

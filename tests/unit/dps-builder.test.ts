@@ -128,3 +128,26 @@ describe("ISS fixo e retenções (27/11/2026)", () => {
     expect(validarXsd(csll).ok).toBe(true);
   });
 });
+
+describe("IBS/CBS do Simples (NT 009)", () => {
+  const ibscbs = { cIndOp: "100301", cst: "200", cClassTrib: "200052", regApIBSCBSSN: null, cAtvSN: null } as const;
+
+  it("sem ibscbs a DPS sai como antes, sem nada de IBS/CBS", () => {
+    const { xml } = montarDps(base);
+    expect(xml).not.toMatch(/IBSCBS|cAtvSN|regApIBSCBSSN/);
+  });
+
+  it("modo grupo: grupo IBSCBS depois de valores, válido no esquema atual (v1.01 de 24/11/2026)", () => {
+    const { xml } = montarDps({ ...base, competencia: "2027-01-01", ibscbs });
+    expect(xml).toContain("</valores><IBSCBS><cIndOp>100301</cIndOp><valores><trib><CST>200</CST><cClassTrib>200052</cClassTrib></trib></valores></IBSCBS></infDPS>");
+    const v = validarXsd(xml);
+    expect(v.saida).not.toMatch(/fails to validate/);
+    expect(v.ok).toBe(true);
+  });
+
+  it("modo completo: regApIBSCBSSN entre regApTribSN e regEspTrib, cAtvSN depois de cNBS (ordem do Anexo VI; esquema do Release 4 ainda não saiu)", () => {
+    const { xml } = montarDps({ ...base, ibscbs: { ...ibscbs, regApIBSCBSSN: "1", cAtvSN: "08" } });
+    expect(xml).toContain("<regApTribSN>1</regApTribSN><regApIBSCBSSN>1</regApIBSCBSSN><regEspTrib>0</regEspTrib>");
+    expect(xml).toContain("<cNBS>113032000</cNBS><cAtvSN>08</cAtvSN><xDescServ>");
+  });
+});

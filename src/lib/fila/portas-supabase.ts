@@ -5,6 +5,8 @@ import { auditar, logSeguranca } from "@/lib/auditoria/audit";
 import { config } from "@/lib/config";
 import { chaveMestra, decifrarArquivo, decifrarTexto, type Cifrado, type MetaCifra } from "@/lib/crypto/cert-vault";
 import { abrirPfx, exigirValido } from "@/lib/crypto/pfx";
+import { itensDoCodigo } from "@/lib/catalogo";
+import type { EntradaIbsCbs } from "@/lib/nfse/ibscbs";
 import { SefinClient, agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
 import { SemCertificado, type ContextoNota, type NotaNaFila, type Portas } from "./worker";
 
@@ -14,6 +16,54 @@ import { SemCertificado, type ContextoNota, type NotaNaFila, type Portas } from 
  */
 type Linha = Record<string, unknown>;
 const s = (v: unknown) => (v == null ? null : String(v));
+
+/**
+ * Dados de IBS/CBS da nota (NT 009). Só é chamado com o envio ligado: assim o worker não depende das colunas
+ * da migration 0019 enquanto NFSE_IBSCBS_SIMPLES = desligado.
+ */
+export async function entradaIbsCbs(db: SupabaseClient, nota: Linha, opSimpNac: 2 | 3): Promise<EntradaIbsCbs> {
+  const { data: emp, error: e1 } = await db.from("empresa").select("regime_ibscbs_sn, cativ_sn").eq("id", nota.empresa_id).single();
+  if (e1 || !emp) throw new Error(`não leu o regime do IBS/CBS da empresa: ${e1?.message}`);
+  // serviço da nota; nota de planilha (sem serviço) usa o serviço cadastrado com o mesmo código e NBS, se for um só
+  let q = db.from("servico").select("cclasstrib, cind_op, cativ_sn").eq("empresa_id", nota.empresa_id);
+  q = nota.servico_id
+    ? q.eq("id", nota.servico_id)
+    : q.eq("codigo_tributacao_nacional", String(nota.codigo_tributacao_nacional)).eq("ativo", true);
+  const { data: svs, error: e2 } = await q;
+  if (e2) throw new Error(`não leu o IBS/CBS do serviço: ${e2.message}`);
+  const comIbs = (svs ?? [])
+    .map((sv) => ({ cClassTrib: s(sv.cclasstrib)?.trim() || null, cIndOp: s(sv.cind_op)?.trim() || null, cAtvSN: s(sv.cativ_sn)?.trim() || null }))
+    .filter((sv) => sv.cClassTrib || sv.cIndOp || sv.cAtvSN);
+  const distintos = new Set(comIbs.map((sv) => JSON.stringify(sv)));
+  const servico: EntradaIbsCbs["servico"] = distintos.size === 1 ? comIbs[0]! : null;
+  let correlacao: EntradaIbsCbs["correlacao"] = [];
+  if (nota.codigo_nbs) {
+    const { data: cr, error: e3 } = await db
+      .from("correlacao_ibscbs")
+      .select("ind_op, cclasstrib")
+      .in("item", itensDoCodigo(String(nota.codigo_tributacao_nacional)))
+      .eq("nbs", String(nota.codigo_nbs))
+      .lte("inicio_vigencia", String(nota.competencia));
+    if (e3) throw new Error(`não leu a correlação do IBS/CBS: ${e3.message}`);
+    correlacao = (cr ?? []).map((c) => ({ indOp: String(c.ind_op), cClassTrib: String(c.cclasstrib) }));
+  }
+  const codigos = [...new Set([...correlacao.map((c) => c.cClassTrib), ...(servico?.cClassTrib ? [servico.cClassTrib] : [])])];
+  const cstDoCclasstrib: Record<string, string> = {};
+  if (codigos.length) {
+    const { data: cc, error: e4 } = await db.from("cclasstrib").select("codigo, cst").in("codigo", codigos);
+    if (e4) throw new Error(`não leu a tabela cClassTrib: ${e4.message}`);
+    for (const c of cc ?? []) cstDoCclasstrib[String(c.codigo)] = String(c.cst);
+  }
+  const reg = Number.parseInt(String(emp.regime_ibscbs_sn ?? 1), 10);
+  return {
+    opSimpNac,
+    regimeIbsCbsSn: reg === 2 || reg === 3 ? reg : 1,
+    cAtvSnEmpresa: s(emp.cativ_sn)?.trim() || null,
+    servico,
+    correlacao,
+    cstDoCclasstrib,
+  };
+}
 
 async function rpc(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<unknown> {
   const { data, error } = await db.rpc(fn, args);
@@ -62,6 +112,7 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
     agora: () => new Date(),
     ambiente: c.NFSE_AMBIENTE,
     retryMinutos: c.RETRY_MINUTOS,
+    modoIbsCbs: c.NFSE_IBSCBS_SIMPLES,
 
     async pegarProximaNota() {
       const data = (await rpc(db, "fn_pegar_proxima_nota", {})) as Linha[] | Linha | null;
@@ -91,12 +142,14 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
           pedidoPor: String(nota.criado_por),
         };
       }
+      const opSimpNac = Number.parseInt(String(e.op_simp_nac), 10) === 2 ? 2 : 3;
+      const ibscbs = c.NFSE_IBSCBS_SIMPLES === "desligado" ? null : await entradaIbsCbs(db, nota as Linha, opSimpNac);
       const { data: mun } = await db.from("municipio_situacao").select("*").eq("cod_ibge", e.cod_municipio).maybeSingle();
       return {
         empresa: {
           cnpj: String(e.cnpj),
           codMunicipio: String(e.cod_municipio),
-          opSimpNac: Number.parseInt(String(e.op_simp_nac), 10) === 2 ? 2 : 3,
+          opSimpNac,
           inscricaoMunicipal: s(e.inscricao_municipal),
           aliquotaSimples: e.aliquota_simples === null || e.aliquota_simples === undefined ? null : String(e.aliquota_simples),
           regimeIss: e.regime_iss === "sociedade_profissionais" ? "sociedade_profissionais" : "normal",
@@ -106,6 +159,7 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
           : null,
         competencia: String(nota.competencia),
         substitui,
+        ibscbs,
         dados: {
           tomador: {
             tipoDocumento: t.tipo_documento === "CNPJ" ? "CNPJ" : "CPF",
