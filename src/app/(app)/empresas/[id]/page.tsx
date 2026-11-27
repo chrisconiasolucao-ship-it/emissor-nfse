@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { Formulario } from "@/components/formulario";
@@ -5,7 +6,8 @@ import { eEscritorio, podeCriarUsuario } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { diasParaVencer } from "@/lib/crypto/pfx";
 import { supabaseServidor } from "@/lib/supabase/server";
-import { criarUsuario, enviarCertificado, retomarEmpresa, salvarEmpresa } from "../actions";
+import { documento } from "@/lib/formato";
+import { alterarAtivaEmpresa, criarUsuario, enviarCertificado, excluirEmpresa, retomarEmpresa, salvarEmpresa } from "../actions";
 
 export default async function Empresa({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,9 +20,17 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
   const { data: cert } = await db.from("certificado").select("titular, cnpj_titular, valido_ate, enviado_em").eq("empresa_id", id).eq("ativo", true).maybeSingle();
   const { data: usuarios } = await db.from("perfil_usuario").select("usuario_id, nome, email, papel, ativo").eq("empresa_id", id).order("nome");
   const dias = cert ? diasParaVencer(new Date(cert.valido_ate)) : null;
+  const { count: notas } = escritorio ? await db.from("nota").select("id", { count: "exact", head: true }).eq("empresa_id", id) : { count: 0 };
   return (
     <>
-      <h1>{e.razao_social}</h1>
+      <div className="cab">
+        <div>
+          <h1>{e.razao_social}</h1>
+          <p>CNPJ {documento(e.cnpj)} · {e.regime}{e.ativa ? "" : " · desativada"}</p>
+        </div>
+        {e.ativa && <div className="acoes">{escritorio ? <a className="botao" href={`/api/empresa-atual?id=${id}&para=/painel`}>Abrir painel da empresa</a> : <Link className="botao" href="/painel">Painel</Link>}</div>}
+      </div>
+      {!e.ativa && <div className="msg alerta">Esta empresa está desativada: não aparece nas listas nem no menu, e a busca no ADN não roda para ela.</div>}
       {e.pausada && (
         <div className="msg alerta">
           Emissão pausada: {e.motivo_pausa}
@@ -96,6 +106,38 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
             </label>
           </Formulario>
         </div>
+      )}
+
+      {escritorio && (
+        <>
+          <h2>Desativar ou excluir</h2>
+          <div className="cartao zona-perigo">
+            <div>
+              <strong>{e.ativa ? "Desativar empresa" : "Reativar empresa"}</strong>
+              <p className="suave">{e.ativa
+                ? "Ela sai da lista de empresas, do menu e da busca automática no ADN. Notas, tomadores, serviços e certificado ficam guardados, e dá para reativar depois."
+                : "Ela volta para a lista de empresas e para a busca automática no ADN."}</p>
+              <Formulario acao={alterarAtivaEmpresa} botao={<button type="submit" className="secundario">{e.ativa ? "Desativar empresa" : "Reativar empresa"}</button>}>
+                <input type="hidden" name="empresa_id" value={id} />
+                <input type="hidden" name="ativa" value={e.ativa ? "false" : "true"} />
+              </Formulario>
+            </div>
+            <div>
+              <strong>Excluir de vez</strong>
+              {(notas ?? 0) > 0 ? (
+                <p className="suave">Esta empresa tem {notas} {notas === 1 ? "nota" : "notas"}. Nota fiscal fica guardada por lei, então a empresa não pode ser excluída; use Desativar.</p>
+              ) : (
+                <>
+                  <p className="suave">Só para empresa cadastrada por engano, sem notas, importações nem usuários. Apaga o cadastro, o certificado, os tomadores e os serviços. Não tem como desfazer.</p>
+                  <Formulario acao={excluirEmpresa} className="grade" botao={<button type="submit" className="perigo">Excluir empresa</button>}>
+                    <input type="hidden" name="empresa_id" value={id} />
+                    <label>Digite o CNPJ para confirmar<input name="confirmacao" required autoComplete="off" placeholder={documento(e.cnpj)} /></label>
+                  </Formulario>
+                </>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </>
   );

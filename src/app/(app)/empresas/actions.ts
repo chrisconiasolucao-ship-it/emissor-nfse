@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { auditar, ipDe, logSeguranca } from "@/lib/auditoria/audit";
 import { exigir, podeCriarUsuario, podeGerirCertificado, podeGerirEmpresas, type Papel } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
+import { COOKIE_EMPRESA } from "@/lib/empresa-atual";
 import { chaveMestra, cifrarArquivo, cifrarTexto } from "@/lib/crypto/cert-vault";
 import { abrirPfx, CertificadoVencido, exigirValido, SenhaCertificadoInvalida, type CertificadoAberto } from "@/lib/crypto/pfx";
 import { consultarCnpj, EmpresaForaDoEscopo, sugerirEmpresa, type EmpresaSugerida } from "@/lib/empresa/consulta-cnpj";
@@ -215,4 +216,56 @@ export async function retomarEmpresa(form: FormData): Promise<void> {
   const empresaId = z.uuid().parse(form.get("empresa_id"));
   await supabaseAdmin().rpc("fn_retomar_empresa", { p_empresa_id: empresaId, p_quem: perfil.usuarioId });
   revalidatePath(`/empresas/${empresaId}`);
+}
+
+/**
+ * Desativar: a empresa some das listas, do menu e dos workers (ADN, cadastros); notas e cadastros ficam.
+ * Reativar desfaz.
+ */
+export async function alterarAtivaEmpresa(_: Estado, form: FormData): Promise<Estado> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirEmpresas(perfil), "Só o escritório desativa empresa.");
+  const empresaId = z.uuid().parse(form.get("empresa_id"));
+  const ativa = form.get("ativa") === "true";
+  const db = await supabaseServidor();
+  const { error } = await db.from("empresa").update({ ativa }).eq("id", empresaId);
+  if (error) return { erro: error.message };
+  await auditar(supabaseAdmin(), { empresaId, acao: ativa ? "reativar_empresa" : "desativar_empresa", entidade: "empresa", entidadeId: empresaId, depois: { ativa }, quem: perfil.usuarioId, ip: ipDe(await headers()) });
+  if (!ativa && (await cookies()).get(COOKIE_EMPRESA)?.value === empresaId) (await cookies()).delete(COOKIE_EMPRESA);
+  revalidatePath("/", "layout");
+  return { ok: true, mensagem: ativa ? "Empresa reativada: voltou para a lista de empresas." : "Empresa desativada. Ela fica em Empresas › Desativadas e pode ser reativada." };
+}
+
+/**
+ * Excluir de vez: só empresa sem nenhuma nota, importação ou documento (nota fiscal não se apaga) e sem
+ * usuários. Apaga certificado, tomadores, serviços e avisos dela. Pede o CNPJ digitado como confirmação.
+ */
+export async function excluirEmpresa(_: Estado, form: FormData): Promise<Estado> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirEmpresas(perfil), "Só o escritório exclui empresa.");
+  const empresaId = z.uuid().parse(form.get("empresa_id"));
+  const admin = supabaseAdmin();
+  const { data: emp } = await admin.from("empresa").select("id, cnpj, razao_social").eq("id", empresaId).maybeSingle();
+  if (!emp) return { erro: "Empresa não encontrada." };
+  if (String(form.get("confirmacao") ?? "").replace(/\D/g, "") !== emp.cnpj) return { erro: "Digite o CNPJ da empresa para confirmar a exclusão." };
+  const contar = async (tabela: string) => (await admin.from(tabela).select("*", { count: "exact", head: true }).eq("empresa_id", empresaId)).count ?? 0;
+  const [notas, importacoes, documentos, usuarios] = await Promise.all([contar("nota"), contar("importacao"), contar("documento"), contar("perfil_usuario")]);
+  if (notas > 0) return { erro: `Esta empresa tem ${notas} ${notas === 1 ? "nota" : "notas"}. Nota fiscal não pode ser apagada; use Desativar.` };
+  if (importacoes + documentos > 0) return { erro: "Esta empresa tem arquivos importados guardados. Use Desativar." };
+  if (usuarios > 0) return { erro: `Esta empresa tem ${usuarios} ${usuarios === 1 ? "usuário" : "usuários"} de acesso. Use Desativar.` };
+
+  // a trilha grava antes de apagar: se não gravar, nada é apagado (AT-033)
+  await auditar(admin, { empresaId, acao: "excluir_empresa", entidade: "empresa", entidadeId: empresaId, antes: { cnpj: emp.cnpj, razao_social: emp.razao_social }, quem: perfil.usuarioId, ip: ipDe(await headers()) });
+  const { data: certs } = await admin.from("certificado").select("storage_path").eq("empresa_id", empresaId);
+  const caminhos = (certs ?? []).map((c) => String(c.storage_path)).filter(Boolean);
+  if (caminhos.length) await admin.storage.from("certificados").remove(caminhos);
+  for (const tabela of ["aviso", "adn_cursor", "certificado", "tomador", "servico"]) {
+    const { error } = await admin.from(tabela).delete().eq("empresa_id", empresaId);
+    if (error) return { erro: `Não foi possível apagar ${tabela}: ${error.message}` };
+  }
+  const { error } = await admin.from("empresa").delete().eq("id", empresaId);
+  if (error) return { erro: error.message };
+  if ((await cookies()).get(COOKIE_EMPRESA)?.value === empresaId) (await cookies()).delete(COOKIE_EMPRESA);
+  revalidatePath("/", "layout");
+  redirect("/empresas");
 }

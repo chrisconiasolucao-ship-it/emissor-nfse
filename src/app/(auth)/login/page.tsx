@@ -23,15 +23,19 @@ export default function Login() {
   }
 
   return (
-    <main style={{ maxWidth: 380, paddingTop: 80 }}>
-      <h1>Emissor NFS-e</h1>
-      <form action={entrar} className="cartao" style={{ display: "grid", gap: 12 }}>
+    <main className="entrada">
+      <form action={entrar} className="cartao">
+        <div className="marca">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-chriscon.svg" alt="" width={44} height={44} />
+          <span><strong>CHRISCON · NFS-e</strong><small>emissor de notas</small></span>
+        </div>
         <label>E-mail<input name="email" type="email" autoComplete="username" required /></label>
         <label>Senha<input name="senha" type="password" autoComplete="current-password" required /></label>
         {erro && <div className="msg erro">{erro}</div>}
         <button type="submit" disabled={pendente}>{pendente ? "Entrando…" : "Entrar"}</button>
+        <p className="suave" style={{ margin: 0 }}>Depois de 3 senhas erradas o acesso fica bloqueado por 15 minutos.</p>
       </form>
-      <p className="suave">Depois de 3 senhas erradas o acesso fica bloqueado por 15 minutos.</p>
     </main>
   );
 }

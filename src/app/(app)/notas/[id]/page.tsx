@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { reais } from "@/lib/money";
+import { codigoServico, documento } from "@/lib/formato";
 import { notFound } from "next/navigation";
 import { Formulario } from "@/components/formulario";
 import { podeCancelarOuSubstituir } from "@/lib/auth/permissoes";
@@ -22,44 +23,70 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
   const empresa = n.empresa as unknown as { razao_social: string; cnpj: string };
   const tomador = n.tomador as unknown as { nome: string; documento: string } | null;
   const pode = podeCancelarOuSubstituir(perfil, n.empresa_id);
+  const docRotulo = (t: string) => (t === "danfse" ? "Baixar DANFSe" : t === "xml_autorizado" ? "XML autorizado" : t === "xml_evento" ? "XML do evento" : t);
+  const quando = (d: string | null) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) : null);
+  const ordenados = [...(docs ?? [])].sort((a, b) => (a.tipo === "danfse" ? -1 : b.tipo === "danfse" ? 1 : 0));
   return (
     <>
-      <h1>Nota {n.numero_nfse ? `nº ${n.numero_nfse}` : ""} <span className={`selo ${n.situacao}`}>{ROTULO[n.situacao]}</span></h1>
-      {n.motivo_rejeicao && <div className={`msg ${n.situacao === "rejeitada" ? "erro" : "alerta"}`}>{n.motivo_rejeicao}</div>}
-      <div className="cartao">
-        <p><strong>{empresa.razao_social}</strong> ({empresa.cnpj}) → {tomador ? `${tomador.nome} (${tomador.documento})` : "sem tomador"}</p>
-        <p>{n.descricao}</p>
-        <p>Valor: {reais(n.valor_servico)} · Competência: {n.competencia?.slice(0, 7)} · ISS {n.iss_retido ? `retido (${n.aliquota_iss}%)` : "não retido"}</p>
-        {n.chave_acesso && <p className="suave">Chave de acesso: {n.chave_acesso}</p>}
-        {n.id_dps && <p className="suave">DPS: {n.id_dps} · tentativas: {n.tentativas}</p>}
-      </div>
+      <section className="cartao nota-topo">
+        <div>
+          <span className="suave">{n.numero_nfse ? `NFS-e nº ${n.numero_nfse}` : "Nota sem número"} · {empresa.razao_social}</span>
+          <div className="valor">{reais(n.valor_servico)}</div>
+          <span className={`selo ${n.situacao}`}>{ROTULO[n.situacao]}{n.situacao === "autorizada" && n.autorizada_em ? ` em ${quando(n.autorizada_em)}` : ""}</span>
+        </div>
+        <div className="acoes">
+          {ordenados.map((d, i) => (
+            <a key={d.id} className={`botao${i === 0 && d.tipo === "danfse" ? "" : " secundario"}`} href={`/api/documentos/${d.id}`}>{docRotulo(d.tipo)}</a>
+          ))}
+          <Link className="botao secundario" href={`/notas/nova?modelo=${id}`}>Emitir outra igual</Link>
+          {(n.situacao === "rascunho" || n.situacao === "rejeitada") && <Link className="botao" href={`/notas/nova?editar=${id}`}>{n.situacao === "rejeitada" ? "Corrigir e reenviar" : "Editar"}</Link>}
+          {n.situacao === "autorizada" && pode && <Link className="botao secundario" href={`/notas/nova?substitui=${id}`}>Substituir</Link>}
+        </div>
+      </section>
 
-      {(docs ?? []).length > 0 && (
-        <>
-          <h2>Arquivos</h2>
-          <div className="acoes">
-            {(docs ?? []).map((d) => (
-              <a key={d.id} href={`/api/documentos/${d.id}`}>{d.tipo === "danfse" ? "DANFSe (PDF)" : d.tipo === "xml_autorizado" ? "XML autorizado" : d.tipo === "xml_evento" ? "XML do evento" : d.tipo}</a>
-            ))}
-          </div>
-        </>
-      )}
+      {n.motivo_rejeicao && <div className={`msg ${n.situacao === "rejeitada" ? "erro" : "alerta"}`}>{n.motivo_rejeicao}</div>}
 
       {(eventos ?? []).map((e, i) => (
         <div key={i} className="msg alerta">
-          {e.tipo === "cancelamento" ? "Cancelada" : "Substituída"} em {new Date(e.registrado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}: {e.motivo}
-          {e.nota_substituta_id && <> · <Link href={`/notas/${e.nota_substituta_id}`}>nota nova</Link></>}
+          {e.tipo === "cancelamento" ? "Cancelada" : "Substituída"} em {quando(e.registrado_em)}: {e.motivo}
+          {e.nota_substituta_id && <> · <Link href={`/notas/${e.nota_substituta_id}`}>abrir a nota nova</Link></>}
         </div>
       ))}
 
-      <div className="acoes" style={{ marginTop: 16 }}>
-        <Link href={`/notas/nova?modelo=${id}`}>Usar como modelo</Link>
-        {(n.situacao === "rascunho" || n.situacao === "rejeitada") && <Link href={`/notas/nova?editar=${id}`}>Editar</Link>}
-        {n.situacao === "autorizada" && pode && <Link href={`/notas/nova?substitui=${id}`}>Substituir</Link>}
+      <div className="blocos">
+        <section className="cartao"><div className="cartao-cab"><h3>Prestador</h3></div>
+          <dl><dt>Razão social</dt><dd>{empresa.razao_social}</dd><dt>CNPJ</dt><dd>{documento(empresa.cnpj)}</dd></dl>
+        </section>
+        <section className="cartao"><div className="cartao-cab"><h3>Tomador</h3></div>
+          {tomador ? <dl><dt>Nome</dt><dd>{tomador.nome}</dd><dt>CPF/CNPJ</dt><dd>{documento(tomador.documento)}</dd></dl> : <p className="suave" style={{ margin: 0 }}>Sem tomador identificado.</p>}
+        </section>
+        <section className="cartao"><div className="cartao-cab"><h3>Serviço</h3></div>
+          <dl>
+            {n.codigo_tributacao_nacional && <><dt>Código</dt><dd><span className="codigo">{codigoServico(n.codigo_tributacao_nacional)}</span>{n.codigo_nbs ? <span className="suave"> · NBS {n.codigo_nbs}</span> : null}</dd></>}
+            <dt>Descrição</dt><dd>{n.descricao}</dd>
+            <dt>Competência</dt><dd>{n.competencia ? `${n.competencia.slice(5, 7)}/${n.competencia.slice(0, 4)}` : "—"}</dd>
+          </dl>
+        </section>
+        <section className="cartao"><div className="cartao-cab"><h3>Valores</h3></div>
+          <dl>
+            <dt>Valor do serviço</dt><dd className="num" style={{ textAlign: "left" }}><b>{reais(n.valor_servico)}</b></dd>
+            <dt>ISS</dt><dd>{n.iss_retido ? `retido pelo tomador (${n.aliquota_iss}%)` : "não retido (recolhido no DAS)"}</dd>
+            {n.valor_liquido != null && <><dt>Valor líquido</dt><dd className="num" style={{ textAlign: "left" }}>{reais(n.valor_liquido)}</dd></>}
+          </dl>
+        </section>
       </div>
 
+      {(n.chave_acesso || n.id_dps) && (
+        <section className="cartao"><div className="cartao-cab"><h3>Identificação na Receita</h3></div>
+          <dl>
+            {n.chave_acesso && <><dt>Chave de acesso</dt><dd className="codigo" style={{ color: "var(--texto)" }}>{n.chave_acesso}</dd></>}
+            {n.id_dps && <><dt>DPS</dt><dd>{n.id_dps} · {n.tentativas} {n.tentativas === 1 ? "tentativa" : "tentativas"} de envio</dd></>}
+          </dl>
+        </section>
+      )}
+
       {n.situacao === "rascunho" && (
-        <div className="acoes" style={{ marginTop: 12 }}>
+        <div className="acoes">
           <Formulario acao={emitirRascunho} botao={<button type="submit">Emitir este rascunho</button>}>
             <input type="hidden" name="empresa_id" value={n.empresa_id} />
             <input type="hidden" name="id" value={id} />
@@ -74,8 +101,8 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
 
       {n.situacao === "autorizada" && pode && (
         <>
-          <h2>Cancelar</h2>
           <div className="cartao">
+            <div className="cartao-cab"><h3>Cancelar esta nota</h3><span className="suave">O cancelamento é enviado à Receita e não pode ser desfeito.</span></div>
             <Formulario acao={cancelarNota} className="grade" botao={<button className="perigo" type="submit">Cancelar nota na Receita</button>}>
               <input type="hidden" name="empresa_id" value={n.empresa_id} />
               <input type="hidden" name="id" value={id} />
