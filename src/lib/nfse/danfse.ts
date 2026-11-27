@@ -394,7 +394,11 @@ export async function gerarDanfse(xml: string, opts: { nomeMunicipio?: NomeMunic
   const vPis = txt(piscofins.vPis);
   const vCofins = txt(piscofins.vCofins);
   const vCsll = txt(tribFed.vRetCSLL);
-  const contribRetidas = tpRetPC === "1" ? [vCsll, vPis, vCofins].reduce((s, v) => s.plus(lerValor(v ?? "0")), lerValor("0")).toFixed(2) : vCsll;
+  // soma o que o tpRetPisCofins diz que foi retido (PIS, COFINS e CSLL)
+  const pisRet = ["1", "3", "4", "5", "9"].includes(tpRetPC ?? "");
+  const cofinsRet = ["1", "3", "4", "6", "7"].includes(tpRetPC ?? "");
+  const partesRet = [vCsll, pisRet ? vPis : null, cofinsRet ? vCofins : null];
+  const contribRetidas = partesRet.some((v) => v) ? partesRet.reduce((s, v) => s.plus(lerValor(v ?? "0")), lerValor("0")).toFixed(2) : null;
   d.campo("IRRF", moeda(txt(tribFed.vRetIRRF)), COL[1]!, L1);
   d.campo("Contribuição Previdenciária - Retida", moeda(txt(tribFed.vRetCP)), COL[2]!, L1);
   d.campo("Contribuições Sociais - Retidas", moeda(contribRetidas), COL[3]!, L1);

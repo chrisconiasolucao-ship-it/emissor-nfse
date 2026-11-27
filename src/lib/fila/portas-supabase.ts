@@ -72,7 +72,7 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
     async carregarContexto(n): Promise<ContextoNota> {
       const { data: nota, error } = await db
         .from("nota")
-        .select("*, empresa:empresa_id(cnpj, cod_municipio, op_simp_nac, inscricao_municipal, aliquota_simples), tomador:tomador(*)")
+        .select("*, empresa:empresa_id(cnpj, cod_municipio, op_simp_nac, inscricao_municipal, aliquota_simples, regime_iss), tomador:tomador(*)")
         .eq("empresa_id", n.empresaId)
         .eq("id", n.id)
         .single();
@@ -99,6 +99,7 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
           opSimpNac: Number.parseInt(String(e.op_simp_nac), 10) === 2 ? 2 : 3,
           inscricaoMunicipal: s(e.inscricao_municipal),
           aliquotaSimples: e.aliquota_simples === null || e.aliquota_simples === undefined ? null : String(e.aliquota_simples),
+          regimeIss: e.regime_iss === "sociedade_profissionais" ? "sociedade_profissionais" : "normal",
         },
         municipio: mun
           ? { codIbge: String(mun.cod_ibge), nome: String(mun.nome), uf: String(mun.uf), ativoOperacional: Boolean(mun.ativo_operacional), emissorNacional: Boolean(mun.emissor_nacional) }
@@ -123,7 +124,12 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
             codigoNbs: s(nota.codigo_nbs),
             descricao: String(nota.descricao),
           },
-          valores: { valorServico: String(nota.valor_servico), issRetido: Boolean(nota.iss_retido), aliquotaIss: s(nota.aliquota_iss) },
+          valores: {
+            valorServico: String(nota.valor_servico),
+            issRetido: Boolean(nota.iss_retido),
+            aliquotaIss: s(nota.aliquota_iss),
+            retencoes: { inss: s(nota.pct_ret_inss), irrf: s(nota.pct_ret_irrf), csll: s(nota.pct_ret_csll), pis: s(nota.pct_ret_pis), cofins: s(nota.pct_ret_cofins) },
+          },
         },
       };
     },

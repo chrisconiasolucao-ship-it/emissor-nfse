@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { reais } from "@/lib/money";
+import { ROTULO_RETENCAO, TRIBUTOS_RETIDOS } from "@/lib/nfse/retencoes";
 import { codigoServico, documento } from "@/lib/formato";
 import { notFound } from "next/navigation";
 import { Formulario } from "@/components/formulario";
@@ -72,6 +73,16 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
           <dl>
             <dt>Valor do serviço</dt><dd className="num" style={{ textAlign: "left" }}><b>{reais(n.valor_servico)}</b></dd>
             <dt>ISS</dt><dd>{n.iss_retido ? `retido pelo tomador (${n.aliquota_iss}%)` : "não retido (recolhido no DAS)"}</dd>
+            {TRIBUTOS_RETIDOS.some((t) => Number(n[`valor_ret_${t}`] ?? 0) > 0) && (
+              <>
+                <dt>Retenções federais</dt>
+                <dd>
+                  {TRIBUTOS_RETIDOS.filter((t) => Number(n[`valor_ret_${t}`] ?? 0) > 0)
+                    .map((t) => `${ROTULO_RETENCAO[t]} ${reais(n[`valor_ret_${t}`])} (${String(n[`pct_ret_${t}`]).replace(".", ",")}%)`)
+                    .join(" · ")}
+                </dd>
+              </>
+            )}
             {n.valor_liquido != null && <><dt>Valor líquido</dt><dd className="num" style={{ textAlign: "left" }}>{reais(n.valor_liquido)}</dd></>}
           </dl>
         </section>

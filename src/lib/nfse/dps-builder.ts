@@ -1,5 +1,6 @@
 import { dinheiro, lerValor } from "@/lib/money";
 import { montarIdDps } from "./dps-id";
+import { lerPercentual, tipoRetPisCofins, valoresRetencao, type PercentuaisRetencao } from "./retencoes";
 import { dataHoraBrasilia, el, esc, grupo } from "./xml";
 
 /**
@@ -23,6 +24,8 @@ export type DadosDps = {
     codMunicipio: string;
     opSimpNac: 2 | 3;
     aliquotaSimples?: string | null; // pTotTribSN (%), obrigatória para ME/EPP
+    /** sociedade_profissionais = ISS fixo: regEspTrib 6, sem alíquota e sem ISS retido */
+    regimeIss?: "normal" | "sociedade_profissionais" | null;
     inscricaoMunicipal?: string | null;
     telefone?: string | null;
     email?: string | null;
@@ -45,6 +48,8 @@ export type DadosDps = {
     valorServico: string;
     issRetido: boolean;
     aliquotaIss?: string | null; // obrigatória quando retido
+    /** percentuais retidos pelo tomador sobre o valor do serviço */
+    retencoes?: PercentuaisRetencao | null;
   };
   substituicao?: { chaveSubstituida: string; codigoMotivo: "01" | "02" | "03" | "04" | "05" | "99"; motivo?: string | null } | null;
 };
@@ -74,6 +79,40 @@ export function totalTributos(p: DadosDps["prestador"]): string {
 
 export class ErroCadastroDps extends Error {}
 
+/** ISS fixo no Simples (ex.: escritório contábil, LC 123 art. 18 §22-A): federais no SN, ISS por fora (validar na restrita). */
+export const REG_AP_TRIB_SN_ISS_FIXO = "2";
+/** CST do PIS/COFINS no grupo de retenção: optante do Simples não apura PIS/COFINS fora do DAS (validar na restrita). */
+export const CST_PIS_COFINS_SIMPLES = "00";
+
+/** Grupo tribFed (retenções federais) ou "" quando não há retenção. */
+export function tributosFederais(valorServico: string, bruto: PercentuaisRetencao | null | undefined): string {
+  if (!bruto) return "";
+  // "1.5" do banco vira "1.50" (o esquema pede 2 casas)
+  const pct: PercentuaisRetencao = {};
+  for (const [t, v] of Object.entries(bruto)) if (v) pct[t as keyof PercentuaisRetencao] = lerPercentual(v);
+  const v = valoresRetencao(valorServico, pct);
+  const pis = Boolean(pct.pis), cofins = Boolean(pct.cofins), csll = Boolean(pct.csll);
+  const piscofins =
+    pis || cofins || csll
+      ? grupo(
+          "piscofins",
+          el("CST", CST_PIS_COFINS_SIMPLES) +
+            (pis || cofins ? el("vBCPisCofins", valorServico) : "") +
+            (pis ? el("pAliqPis", pct.pis!) : "") +
+            (cofins ? el("pAliqCofins", pct.cofins!) : "") +
+            (pis ? el("vPis", v.pis) : "") +
+            (cofins ? el("vCofins", v.cofins) : "") +
+            el("tpRetPisCofins", tipoRetPisCofins(pis, cofins, csll)),
+        )
+      : "";
+  const corpo =
+    piscofins +
+    (pct.inss ? el("vRetCP", v.inss) : "") +
+    (pct.irrf ? el("vRetIRRF", v.irrf) : "") +
+    (csll ? el("vRetCSLL", v.csll) : "");
+  return corpo ? grupo("tribFed", corpo) : "";
+}
+
 export function montarDps(d: DadosDps): { xml: string; idDps: string } {
   const idDps = montarIdDps(d.prestador.codMunicipio, d.prestador.cnpj, d.serie, d.numero);
   const vServ = dinheiro(d.valores.valorServico);
@@ -82,6 +121,10 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
     throw new Error("descrição do serviço precisa ter de 1 a 2000 caracteres");
   }
   if (d.valores.issRetido && !d.valores.aliquotaIss) throw new Error("ISS retido exige alíquota");
+  const issFixo = d.prestador.regimeIss === "sociedade_profissionais";
+  if (issFixo && d.valores.issRetido) {
+    throw new ErroCadastroDps("Empresa com ISS fixo (sociedade de profissionais) não tem ISS retido pelo tomador. Desmarque o ISS retido.");
+  }
   const totTrib = totalTributos(d.prestador);
 
   const t = d.tomador;
@@ -108,8 +151,8 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
   const regTrib =
     el("opSimpNac", String(d.prestador.opSimpNac)) +
     // ME/EPP: apuração de tributos federais e municipal pelo Simples (validar na restrita)
-    (d.prestador.opSimpNac === 3 ? el("regApTribSN", "1") : "") +
-    el("regEspTrib", "0");
+    (d.prestador.opSimpNac === 3 ? el("regApTribSN", issFixo ? REG_AP_TRIB_SN_ISS_FIXO : "1") : "") +
+    el("regEspTrib", issFixo ? "6" : "0");
 
   const tribMun =
     el("tribISSQN", "1") +
@@ -155,7 +198,7 @@ export function montarDps(d: DadosDps): { xml: string; idDps: string } {
     grupo(
       "valores",
       grupo("vServPrest", el("vServ", vServ)) +
-        grupo("trib", grupo("tribMun", tribMun) + grupo("totTrib", totTrib)),
+        grupo("trib", grupo("tribMun", tribMun) + tributosFederais(vServ, d.valores.retencoes) + grupo("totTrib", totTrib)),
     );
 
   const xml = `<DPS xmlns="${NS_NFSE}" versao="${VERSAO_DPS}"><infDPS Id="${esc(idDps)}">${infDps}</infDPS></DPS>`;

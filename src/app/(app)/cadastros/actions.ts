@@ -9,6 +9,7 @@ import { guardarServico } from "@/lib/cadastros/aprender";
 import { cnpjValido, cpfValido } from "@/lib/importacao/planilha";
 import { codigoServico, documento } from "@/lib/formato";
 import { lerValor, reais } from "@/lib/money";
+import { lerPercentual } from "@/lib/nfse/retencoes";
 import { supabaseServidor } from "@/lib/supabase/server";
 
 const opc = (max = 255) => z.string().trim().max(max).optional().transform((v) => (v ? v : null));
@@ -78,6 +79,21 @@ export async function excluirTomador(_: Estado, form: FormData): Promise<Estado>
 
 /* ---------- Serviços ---------- */
 
+const pctOpc = z
+  .string()
+  .trim()
+  .max(10)
+  .optional()
+  .refine((v) => {
+    try {
+      lerPercentual(v);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "percentual de retenção precisa ser maior que 0, menor que 100 e ter até 2 casas")
+  .transform((v) => lerPercentual(v));
+
 const servicoSchema = z
   .object({
     id: idOpc,
@@ -90,6 +106,11 @@ const servicoSchema = z
     valor_padrao: decimal("valor"),
     iss_retido: z.string().optional().transform((v) => v === "on" || v === "true"),
     aliquota_iss: decimal("alíquota"),
+    ret_inss: pctOpc,
+    ret_irrf: pctOpc,
+    ret_csll: pctOpc,
+    ret_pis: pctOpc,
+    ret_cofins: pctOpc,
   })
   .refine((d) => !d.iss_retido || !!d.aliquota_iss, { message: "ISS retido exige alíquota", path: ["aliquota_iss"] });
 
@@ -97,10 +118,15 @@ export async function salvarServico(_: Estado, form: FormData): Promise<Estado> 
   const perfil = await perfilAtual();
   const r = servicoSchema.safeParse(Object.fromEntries(form));
   if (!r.success) return { erro: r.error.issues.map((i) => i.message).join("; ") };
-  const { id, ...d } = r.data;
+  const { id, ret_inss, ret_irrf, ret_csll, ret_pis, ret_cofins, ...d } = r.data;
   exigir(podeEmitir(perfil, d.empresa_id));
   const linha = {
     ...d,
+    pct_ret_inss: ret_inss,
+    pct_ret_irrf: ret_irrf,
+    pct_ret_csll: ret_csll,
+    pct_ret_pis: ret_pis,
+    pct_ret_cofins: ret_cofins,
     valor_padrao: d.valor_padrao ? lerValor(d.valor_padrao).toFixed(2) : null,
     aliquota_iss: d.aliquota_iss ? lerValor(d.aliquota_iss).toFixed(2) : null,
   };
