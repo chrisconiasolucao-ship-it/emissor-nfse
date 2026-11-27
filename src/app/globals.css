@@ -297,3 +297,27 @@ td > .suave { display: block; font-size: 12.5px; }
 .resumo-empresas td.tem-erro a { color: var(--erro); font-weight: 700; }
 .abrir-empresa .escolha-lista { max-height: 232px; }
 .resumo-empresas td:first-child { min-width: 240px; }
+
+/* ---------- Importar: faixa do ADN em destaque ---------- */
+.adn { background: linear-gradient(135deg, var(--grafite) 0%, var(--grafite-2) 100%); color: #fff; border-radius: var(--raio); padding: 22px 24px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; }
+.adn h2 { margin: 4px 0 6px; font-size: 19px; color: #fff; }
+.adn p { margin: 0; color: var(--grafite-texto); font-size: 13.5px; max-width: 58ch; }
+.adn-rot { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #9cc3ff; font-weight: 600; }
+.adn-acao { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.adn-acao .acoes { order: -1; width: auto; }
+.adn-acao small { color: var(--grafite-suave); }
+.adn-acao .msg { flex-basis: 100%; }
+.adn-aviso { margin-top: 14px !important; color: #ffd28a !important; }
+.adn-aviso a { color: #fff; }
+.adn-numeros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
+.adn-numeros > div { background: rgb(255 255 255 / .06); border: 1px solid rgb(255 255 255 / .09); border-radius: var(--raio-p); padding: 12px 14px; display: grid; gap: 2px; }
+.adn-numeros b { font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.adn-numeros span { font-size: 12.5px; color: var(--grafite-texto); }
+.adn-numeros .larga { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.etiqueta.prestada { background: var(--primaria-clara); color: var(--primaria-escura); }
+.etiqueta.tomada { background: #efeafb; color: #5b3aa6; }
+.outras-importacoes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.outras-importacoes .cartao { display: grid; gap: 8px; }
+.outras-importacoes h3, .outras-importacoes p { margin: 0; }
+.outras-importacoes form { display: grid; gap: 10px; }
+@media (max-width: 1100px) { .adn, .outras-importacoes { grid-template-columns: 1fr; } }

@@ -6,7 +6,8 @@ import { config } from "@/lib/config";
 import { abrirCertificadoDaEmpresa } from "@/lib/fila/portas-supabase";
 import { sha256 } from "@/lib/importacao/planilha";
 import { AdnClient } from "@/lib/nfse/adn-client";
-import { lerNfse } from "@/lib/nfse/nfse-parser";
+import { lerNfse, type ModeloNota } from "@/lib/nfse/nfse-parser";
+import { inserirComResumo, resumoDaNfse } from "@/lib/nfse/resumo-documento";
 import { aprenderDaNfse } from "@/lib/cadastros/aprender";
 import { agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -53,14 +54,17 @@ export async function POST(req: Request) {
           const caminho = `${e.id}/adn/${hash}.xml`;
           const up = await db.storage.from("documentos").upload(caminho, xml, { contentType: "application/xml", upsert: false });
           if (up.error && !/exists|duplicate/i.test(up.error.message)) throw new Error(`Storage: ${up.error.message}`);
-          const ins = await db.from("documento").insert({ empresa_id: e.id, tipo: "xml_origem", storage_path: caminho, sha256: hash, tamanho: xml.length, content_type: "application/xml", nome_original: d.chaveAcesso ? `${d.chaveAcesso}.xml` : null });
+          let modelo: ModeloNota | null = null;
+          try { modelo = lerNfse(d.xml); } catch { /* XML fora do padrão fica guardado, mas não aparece como modelo */ }
+          const base = { empresa_id: e.id, tipo: "xml_origem", storage_path: caminho, sha256: hash, tamanho: xml.length, content_type: "application/xml", nome_original: d.chaveAcesso ? `${d.chaveAcesso}.xml` : null };
+          const ins = await inserirComResumo((l) => db.from("documento").insert(l), base, modelo ? resumoDaNfse(modelo, e.cnpj) : null);
           if (ins.error?.code === "23505") repetidos++;
           else if (ins.error) throw new Error(ins.error.message);
           else {
             novos++;
-            try {
+            if (modelo) try {
               // nota emitida pela empresa alimenta os cadastros de tomadores e serviços (nunca sobrescreve)
-              const a = await aprenderDaNfse(db, { id: e.id, cnpj: e.cnpj }, lerNfse(d.xml), "adn");
+              const a = await aprenderDaNfse(db, { id: e.id, cnpj: e.cnpj }, modelo, "adn");
               if (a.tomador === "novo") cadastros.tomadores++;
               if (a.servico === "novo") cadastros.servicos++;
             } catch {

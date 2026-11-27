@@ -333,11 +333,16 @@ export async function importarXmlModelo(_: Estado, form: FormData): Promise<Esta
   const caminho = `${empresaId}/xml/${hash}.xml`;
   const up = await admin.storage.from("documentos").upload(caminho, buf, { contentType: "application/xml", upsert: false });
   if (up.error && !/exists|duplicate/i.test(up.error.message)) return { erro: `Storage: ${up.error.message}` };
-  const doc = await admin.from("documento").insert({ empresa_id: empresaId, tipo: "xml_origem", storage_path: caminho, sha256: hash, tamanho: buf.length, content_type: "application/xml", nome_original: arquivo.name, criado_por: perfil.usuarioId }).select("id").single();
-  if (doc.error?.code === "23505") return { erro: "Este XML já foi importado. Nada novo foi importado." };
-  if (doc.error) return { erro: doc.error.message };
-  // nota emitida pela empresa: tomador e serviço vão para os cadastros (sem sobrescrever o que já existe)
   const { data: emp } = await admin.from("empresa").select("cnpj").eq("id", empresaId).single();
+  const { inserirComResumo, resumoDaNfse } = await import("@/lib/nfse/resumo-documento");
+  const doc = await inserirComResumo(
+    (l) => admin.from("documento").insert(l).select("id").single(),
+    { empresa_id: empresaId, tipo: "xml_origem", storage_path: caminho, sha256: hash, tamanho: buf.length, content_type: "application/xml", nome_original: arquivo.name, criado_por: perfil.usuarioId },
+    emp ? resumoDaNfse(modelo, String(emp.cnpj)) : null,
+  );
+  if (doc.error?.code === "23505") return { erro: "Este XML já foi importado. Nada novo foi importado." };
+  if (doc.error || !doc.data) return { erro: doc.error?.message ?? "não gravou o XML" };
+  // nota emitida pela empresa: tomador e serviço vão para os cadastros (sem sobrescrever o que já existe)
   if (emp) await aprenderDaNfse(await supabaseServidor(), { id: empresaId, cnpj: String(emp.cnpj) }, modelo, "xml").catch((e) => console.error(JSON.stringify({ acao: "cadastro_xml", erro: e instanceof Error ? e.message : String(e) })));
   redirect(`/notas/nova?empresa=${empresaId}&documento=${doc.data.id}`);
 }

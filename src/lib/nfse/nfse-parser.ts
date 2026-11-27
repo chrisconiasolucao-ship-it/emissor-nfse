@@ -11,6 +11,7 @@ export type ModeloNota = {
   emitidaEm: string | null;
   competencia: string | null;
   prestadorCnpj: string | null;
+  prestadorNome: string | null;
   tomador: {
     tipoDocumento: "CPF" | "CNPJ" | "EXTERIOR";
     documento: string;
@@ -65,6 +66,7 @@ export function lerNfse(xml: string): ModeloNota {
     emitidaEm: txt(inf.dhProc) ?? txt(infDps.dhEmi),
     competencia: dCompet ? `${dCompet.slice(0, 7)}-01` : null,
     prestadorCnpj: txt(no(infDps.prest).CNPJ),
+    prestadorNome: txt(no(inf.emit).xNome) ?? txt(no(infDps.prest).xNome),
     tomador: tipoDoc
       ? {
           tipoDocumento: tipoDoc,
