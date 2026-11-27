@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: "/tomadores", rotulo: "Tomadores (clientes)" },
     { href: "/servicos", rotulo: "Serviços" },
     { href: "/importar", rotulo: "Importar" },
+    { href: "/relatorios", rotulo: "Relatórios" },
   ];
   // Escritório: primeiro escolhe a empresa na lista; os itens da empresa aparecem quando ela está aberta.
   const grupos: GrupoMenu[] = escritorio
