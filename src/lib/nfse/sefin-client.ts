@@ -1,4 +1,5 @@
 import https from "node:https";
+import { pemsParaTls } from "../crypto/pfx";
 import { classificar, ErroTecnicoSefin, lerErros, type ErroSefin } from "./erros-sefin";
 import { gunzipB64, gzipB64 } from "./xml";
 
@@ -18,7 +19,9 @@ export type RespostaHttp = { status: number; corpo: Buffer; contentType: string 
 export type Transporte = (req: { metodo: "GET" | "POST"; url: string; corpo?: string; timeoutMs: number }) => Promise<RespostaHttp>;
 
 export function agenteMtls(pfx: Buffer, senha: string): https.Agent {
-  return new https.Agent({ pfx, passphrase: senha, keepAlive: true });
+  // chave e cadeia já abertas pelo node-forge: o pfx direto falha no OpenSSL 3 com A1 de criptografia antiga
+  const { key, cert } = pemsParaTls(pfx, senha);
+  return new https.Agent({ key, cert, keepAlive: true });
 }
 
 export function transporteHttps(agent: https.Agent): Transporte {
