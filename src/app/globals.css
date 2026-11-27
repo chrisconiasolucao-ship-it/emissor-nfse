@@ -321,3 +321,17 @@ td > .suave { display: block; font-size: 12.5px; }
 .outras-importacoes h3, .outras-importacoes p { margin: 0; }
 .outras-importacoes form { display: grid; gap: 10px; }
 @media (max-width: 1100px) { .adn, .outras-importacoes { grid-template-columns: 1fr; } }
+
+/* ---------- Relatórios ---------- */
+.relatorios { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.relatorio-cartao { display: flex; gap: 14px; align-items: flex-start; color: inherit; text-decoration: none; }
+.relatorio-cartao:hover { border-color: var(--primaria); color: inherit; }
+.relatorio-cartao > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.relatorio-cartao .selo { justify-self: start; }
+.filtros-relatorio { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.filtros-relatorio label { min-width: 160px; flex: 0 1 auto; }
+.filtros-relatorio label:has(select[name="empresa"]), .filtros-relatorio label:has(select[name="tomador"]), .filtros-relatorio label:has(select[name="servico"]) { min-width: 240px; max-width: 360px; }
+.indicador .relatorio-val { font-size: 22px; }
+.selos { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.selo.alerta { background: var(--alerta-claro); color: var(--alerta); }
+tfoot tr.total td { font-weight: 700; border-top: 2px solid var(--borda-forte); }
