@@ -7,6 +7,7 @@ import { podeCancelarOuSubstituir } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { cancelarNota, emitirRascunho, excluirRascunho } from "../actions";
+import { EnvioDaNota } from "./envio";
 
 const ROTULO: Record<string, string> = { rascunho: "Rascunho", na_fila: "Na fila", enviando: "Enviando", autorizada: "Autorizada", rejeitada: "Rejeitada", cancelada: "Cancelada", substituida: "Substituída" };
 
@@ -98,6 +99,8 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
           </form>
         </div>
       )}
+
+      {n.situacao === "autorizada" && <EnvioDaNota notaId={id} />}
 
       {n.situacao === "autorizada" && pode && (
         <>
