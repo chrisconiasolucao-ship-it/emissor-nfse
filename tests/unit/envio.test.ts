@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { criarToken, lerToken } from "@/lib/envio/link";
+import { criarToken, eRobo, lerToken } from "@/lib/envio/link";
 import { lerEmails, linkWhatsApp, montarEmail, remetente, telefoneWhatsApp, textoWhatsApp } from "@/lib/envio/mensagens";
 import { enviarPorSmtp, FalhaNoEnvio, traduzir } from "@/lib/envio/smtp";
 
@@ -30,6 +30,28 @@ describe("link temporário do WhatsApp", () => {
     const [corpo, sig] = t.split(".");
     const outro = `${corpo!.slice(0, 32)}zzzzzz.${sig}`;
     expect(lerToken(outro, SEGREDO)).toEqual({ erro: "invalido" });
+  });
+});
+
+describe("link ligado ao envio", () => {
+  const ENVIO = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  it("leva o id do envio e o da nota", () => {
+    const t = criarToken(ID, SEGREDO, new Date(), 7, ENVIO);
+    expect(lerToken(t, SEGREDO)).toMatchObject({ notaId: ID, envioId: ENVIO });
+  });
+  it("link antigo, só com a nota, continua valendo", () => {
+    expect(lerToken(criarToken(ID, SEGREDO), SEGREDO)).toMatchObject({ notaId: ID, envioId: null });
+  });
+  it("não deixa trocar o envio mantendo a assinatura", () => {
+    const t = criarToken(ID, SEGREDO, new Date(), 7, ENVIO);
+    const trocado = `${"f".repeat(32)}${t.slice(32)}`;
+    expect(lerToken(trocado, SEGREDO)).toEqual({ erro: "invalido" });
+  });
+  it("prévia do WhatsApp e robôs não contam como abertura; Gmail abrindo a imagem conta", () => {
+    expect(eRobo("WhatsApp/2.23.20.0 A")).toBe(true);
+    expect(eRobo("facebookexternalhit/1.1")).toBe(true);
+    expect(eRobo("Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile Safari/537.36")).toBe(false);
+    expect(eRobo("Mozilla/5.0 (Windows NT 5.1; rv:11.0) Gecko Firefox/11.0 (via ggpht.com GoogleImageProxy)")).toBe(false);
   });
 });
 
@@ -72,6 +94,13 @@ describe("e-mail", () => {
     expect(e.texto).toContain("R$ 200,00");
     expect(e.html).toContain("&lt;b&gt;obrigado&lt;/b&gt;");
     expect(e.html).not.toContain("<b>obrigado");
+  });
+  it("com links, traz o botão de download e a imagem de abertura", () => {
+    const e = montarEmail(NOTA, null, { baixar: "https://x.app/n/tok", abertura: "https://x.app/n/tok/aberto" });
+    expect(e.html).toContain('href="https://x.app/n/tok"');
+    expect(e.html).toContain('<img src="https://x.app/n/tok/aberto"');
+    expect(e.texto).toContain("https://x.app/n/tok");
+    expect(montarEmail(NOTA).html).not.toContain("<img");
   });
   it("envia com anexos, resposta para a empresa e senha sem espaços", async () => {
     let enviado: Record<string, unknown> = {};

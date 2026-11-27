@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { arquivosDaNota, dadosDaNota, lerNotaParaEnvio, segredoDoLink } from "@/lib/envio/arquivos";
-import { lerToken } from "@/lib/envio/link";
+import { headers } from "next/headers";
+import { ipDe } from "@/lib/auditoria/audit";
+import { arquivosDaNota, dadosDaNota, lerNotaParaEnvio, registrarAcesso, segredoDoLink } from "@/lib/envio/arquivos";
+import { eRobo, lerToken } from "@/lib/envio/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,12 @@ export default async function NotaPublica({ params }: { params: Promise<{ token:
   const nota = "notaId" in lido ? await lerNotaParaEnvio(supabaseAdmin(), lido.notaId) : null;
   const arquivos = nota ? await arquivosDaNota(supabaseAdmin(), nota) : [];
   const d = nota ? dadosDaNota(nota) : null;
+  const h = await headers();
+  const navegador = h.get("user-agent");
+  // a prévia que o WhatsApp monta sozinho não conta como abertura do tomador
+  if (nota && "notaId" in lido && !eRobo(navegador)) {
+    await registrarAcesso(supabaseAdmin(), { empresaId: nota.empresa_id, notaId: nota.id, envioId: lido.envioId, tipo: "abriu_link", ip: ipDe(h), navegador });
+  }
   return (
     <main style={{ maxWidth: 520, margin: "48px auto", padding: "0 16px" }}>
       <section className="cartao">

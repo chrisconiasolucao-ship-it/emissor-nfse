@@ -5,7 +5,29 @@ import { Formulario } from "@/components/formulario";
 import { enviarNotaPorEmail, registrarWhatsApp } from "@/app/(app)/notas/envio-actions";
 import { linkWhatsApp, telefoneWhatsApp } from "@/lib/envio/mensagens";
 
-export type EnvioFeito = { canal: string; destinatario: string; situacao: string; erro: string | null; quando: string };
+type Acesso = { primeiro: string; vezes: number } | null;
+export type EnvioFeito = {
+  canal: string; destinatario: string; situacao: string; erro: string | null; quando: string;
+  abriuEmail: Acesso; abriuLink: Acesso; baixouPdf: Acesso; baixouXml: Acesso;
+};
+
+/** "PDF baixado em 27/11 10:02 (2x)" etc.; o que não aconteceu não aparece. */
+function Acessos({ e }: { e: EnvioFeito }) {
+  const itens: [string, Acesso][] = [
+    ["Provável abertura do e-mail", e.abriuEmail],
+    ["Abriu o link", e.abriuLink],
+    ["Baixou o PDF", e.baixouPdf],
+    ["Baixou o XML", e.baixouXml],
+  ];
+  const feitos = itens.filter(([, a]) => a);
+  if (e.situacao === "falhou") return null;
+  if (feitos.length === 0) return <span className="suave">Sem acesso registrado ainda</span>;
+  return (
+    <span style={{ display: "grid", gap: 2 }}>
+      {feitos.map(([rot, a]) => <span key={rot}>{rot} em {a!.primeiro}{a!.vezes > 1 ? ` (${a!.vezes}x)` : ""}</span>)}
+    </span>
+  );
+}
 
 const ROTULO_ENVIO: Record<string, string> = { enviado: "enviado", falhou: "falhou", link_aberto: "WhatsApp aberto com o link" };
 
@@ -13,8 +35,9 @@ const ROTULO_ENVIO: Record<string, string> = { enviado: "enviado", falhou: "falh
  * Envio da nota autorizada ao tomador: e-mail com o PDF e o XML anexados (Gmail do escritório) e WhatsApp
  * pelo wa.me, com a mensagem pronta e um link temporário para baixar os arquivos.
  */
-export function EnviarNota({ notaId, email, telefone, textoWhatsApp, envios }: {
+export function EnviarNota({ notaId, envioWhatsApp, email, telefone, textoWhatsApp, envios }: {
   notaId: string;
+  envioWhatsApp: string;
   email: string | null;
   telefone: string | null;
   textoWhatsApp: string;
@@ -25,7 +48,7 @@ export function EnviarNota({ notaId, email, telefone, textoWhatsApp, envios }: {
   const href = linkWhatsApp(numero, textoWhatsApp);
   return (
     <section className="cartao">
-      <div className="cartao-cab"><h3>Enviar ao tomador</h3><span className="suave">O e-mail leva o PDF e o XML anexados. No WhatsApp vai um link para baixar os dois, válido por 7 dias.</span></div>
+      <div className="cartao-cab"><h3>Enviar ao tomador</h3><span className="suave">O e-mail leva o PDF e o XML anexados e um botão para baixar. No WhatsApp vai um link para baixar os dois, válido por 7 dias. Aberturas do link e downloads ficam registrados abaixo.</span></div>
       <div className="blocos">
         <div>
           <h4 style={{ margin: "0 0 8px" }}>Por e-mail</h4>
@@ -42,7 +65,7 @@ export function EnviarNota({ notaId, email, telefone, textoWhatsApp, envios }: {
             {fone && !numero && <p className="msg alerta largo" style={{ margin: 0 }}>Confira o número: DDD + celular, por exemplo (53) 99999-9999.</p>}
             <div className="acoes largo">
               <a className="botao" href={href} target="_blank" rel="noopener noreferrer" aria-disabled={!numero}
-                onClick={(e) => { if (!numero) { e.preventDefault(); return; } void registrarWhatsApp(notaId, fone); }}>
+                onClick={(e) => { if (!numero) { e.preventDefault(); return; } void registrarWhatsApp(notaId, envioWhatsApp, fone); }}>
                 Abrir no WhatsApp
               </a>
             </div>
@@ -53,7 +76,7 @@ export function EnviarNota({ notaId, email, telefone, textoWhatsApp, envios }: {
       {envios.length > 0 && (
         <div className="tabela sem-borda" style={{ marginTop: 12 }}>
           <table>
-            <thead><tr><th>Quando</th><th>Canal</th><th>Para</th><th>Situação</th></tr></thead>
+            <thead><tr><th>Quando</th><th>Canal</th><th>Para</th><th>Situação</th><th>O que o tomador fez</th></tr></thead>
             <tbody>
               {envios.map((e, i) => (
                 <tr key={i}>
@@ -61,6 +84,7 @@ export function EnviarNota({ notaId, email, telefone, textoWhatsApp, envios }: {
                   <td>{e.canal === "email" ? "E-mail" : "WhatsApp"}</td>
                   <td>{e.destinatario}</td>
                   <td><span className={`selo ${e.situacao === "falhou" ? "rejeitada" : "autorizada"}`}>{ROTULO_ENVIO[e.situacao] ?? e.situacao}</span>{e.erro ? <span className="suave"> {e.erro}</span> : null}</td>
+                  <td><Acessos e={e} /></td>
                 </tr>
               ))}
             </tbody>

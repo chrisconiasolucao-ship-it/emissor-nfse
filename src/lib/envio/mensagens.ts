@@ -54,7 +54,8 @@ export function remetente(empresa: string, email: string): string {
   return `"${nome}" <${email}>`;
 }
 
-export function montarEmail(n: DadosNota, mensagem?: string | null): { assunto: string; html: string; texto: string } {
+/** links: botão de download (o mesmo link do WhatsApp, rastreável) e imagem invisível da provável abertura. */
+export function montarEmail(n: DadosNota, mensagem?: string | null, links?: { baixar: string; abertura: string } | null): { assunto: string; html: string; texto: string } {
   const assunto = `${titulo(n)} · ${n.empresa}`;
   const extra = mensagem?.trim() ? mensagem.trim().slice(0, 1000) : null;
   const linhas = [
@@ -62,11 +63,15 @@ export function montarEmail(n: DadosNota, mensagem?: string | null): { assunto: 
     `Segue a ${titulo(n)} emitida por ${n.empresa}, no valor de ${n.valor}${n.competencia ? `, competência ${n.competencia}` : ""}.`,
     "O PDF (DANFSe) e o XML da nota estão em anexo.",
   ];
-  const texto = [...linhas, ...(extra ? ["", extra] : []), "", `Atenciosamente,`, n.empresa].join("\n");
+  const baixar = links ? [`Se preferir, baixe o PDF e o XML por este link (válido por 7 dias): ${links.baixar}`] : [];
+  const texto = [...linhas, ...(extra ? ["", extra] : []), ...(links ? ["", ...baixar] : []), "", `Atenciosamente,`, n.empresa].join("\n");
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2933;line-height:1.5">
 ${linhas.map((l) => `<p style="margin:0 0 12px">${esc(l)}</p>`).join("\n")}
 ${extra ? `<p style="margin:0 0 12px;white-space:pre-line">${esc(extra)}</p>` : ""}
+${links ? `<p style="margin:16px 0"><a href="${esc(links.baixar)}" style="display:inline-block;background:#1565d8;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:bold">Baixar PDF e XML</a></p>
+<p style="margin:0 0 12px;font-size:12px;color:#6b7785">Link válido por 7 dias.</p>` : ""}
 <p style="margin:16px 0 0">Atenciosamente,<br>${esc(n.empresa)}</p>
+${links ? `<img src="${esc(links.abertura)}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0">` : ""}
 </div>`;
   return { assunto, html, texto };
 }
