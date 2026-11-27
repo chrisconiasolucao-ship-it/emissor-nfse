@@ -336,3 +336,13 @@ form.em-linha { display: inline-flex; flex-direction: row-reverse; align-items: 
 form.em-linha .msg { margin: 0; padding: 3px 8px; font-size: 12px; white-space: nowrap; }
 form.em-linha .acoes { width: auto; }
 .busca-linha .filtros { margin-left: auto; }
+
+/* Nova nota: botões repetidos no Resumo; acompanhar a nota na fila */
+.botoes-lateral { display: grid; gap: 8px; margin-top: 4px; }
+.botoes-lateral button { width: 100%; }
+.botoes-lateral .msg { margin: 0; font-size: 13px; }
+.carregando::before, .giro { content: ""; display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: gira .8s linear infinite; vertical-align: -2px; margin-right: 8px; flex: none; }
+.acompanhar { display: flex; align-items: center; gap: 2px; }
+button.link { background: none; border: 0; padding: 0; color: var(--primaria); text-decoration: underline; font: inherit; cursor: pointer; min-height: 0; }
+@keyframes gira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .carregando::before, .giro { animation-duration: 2.4s; } }

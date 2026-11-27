@@ -2,6 +2,7 @@ import Link from "next/link";
 import { reais } from "@/lib/money";
 import { codigoServico, documento } from "@/lib/formato";
 import { notFound } from "next/navigation";
+import { AcompanharNota } from "@/components/acompanhar-nota";
 import { Formulario } from "@/components/formulario";
 import { podeCancelarOuSubstituir } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
@@ -9,6 +10,11 @@ import { supabaseServidor } from "@/lib/supabase/server";
 import { cancelarNota, emitirRascunho, excluirRascunho } from "../actions";
 
 const ROTULO: Record<string, string> = { rascunho: "Rascunho", na_fila: "Na fila", enviando: "Enviando", autorizada: "Autorizada", rejeitada: "Rejeitada", cancelada: "Cancelada", substituida: "Substituída" };
+
+/** Autorizada há menos de 10 minutos. */
+function recente(iso: string | null): boolean {
+  return iso != null && Date.now() - new Date(iso).getTime() < 10 * 60 * 1000;
+}
 
 export default async function Nota({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -25,6 +31,9 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
   const pode = podeCancelarOuSubstituir(perfil, n.empresa_id);
   const docRotulo = (t: string) => (t === "danfse" ? "Baixar DANFSe" : t === "xml_autorizado" ? "XML autorizado" : t === "xml_evento" ? "XML do evento" : t);
   const quando = (d: string | null) => (d ? new Date(d).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }) : null);
+  const naFila = n.situacao === "na_fila" || n.situacao === "enviando";
+  // o DANFSe é gerado logo depois da autorização; acompanha só por 10 minutos depois dela
+  const semDanfse = n.situacao === "autorizada" && !(docs ?? []).some((d) => d.tipo === "danfse") && recente(n.autorizada_em);
   const ordenados = [...(docs ?? [])].sort((a, b) => (a.tipo === "danfse" ? -1 : b.tipo === "danfse" ? 1 : 0));
   return (
     <>
@@ -43,6 +52,9 @@ export default async function Nota({ params }: { params: Promise<{ id: string }>
           {n.situacao === "autorizada" && pode && <Link className="botao secundario" href={`/notas/nova?substitui=${id}`}>Substituir</Link>}
         </div>
       </section>
+
+      {naFila && <AcompanharNota texto={n.situacao === "enviando" ? "Enviando para a Receita. A tela atualiza sozinha quando ela responder." : "Na fila de emissão. A tela atualiza sozinha quando a Receita responder."} />}
+      {semDanfse && <AcompanharNota texto="Nota autorizada. Gerando o DANFSe em PDF…" />}
 
       {n.motivo_rejeicao && <div className={`msg ${n.situacao === "rejeitada" ? "erro" : "alerta"}`}>{n.motivo_rejeicao}</div>}
 
