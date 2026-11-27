@@ -30,6 +30,16 @@ const servidorSchema = z.object({
   MUNICIPIOS_ALERTA_DIAS: inteiro(30),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   BLOB_STORE_ID: z.string().optional(),
+  // Envio da nota ao tomador por e-mail: Gmail do escritório (SMTP com senha de app do Google).
+  // Sem SMTP_USUARIO/SMTP_SENHA o botão de e-mail avisa que falta configurar.
+  SMTP_HOST: z.string().default("smtp.gmail.com"),
+  SMTP_PORTA: inteiro(465),
+  SMTP_USUARIO: z.string().optional(),
+  SMTP_SENHA: z.string().optional(),
+  // Resposta quando a empresa não tem e-mail no cadastro; vazio usa o SMTP_USUARIO.
+  EMAIL_ESCRITORIO: z.string().optional(),
+  // Assina o link temporário do WhatsApp; sem ele usa o WORKER_SECRET.
+  ENVIO_LINK_SECRET: z.string().min(32).optional(),
 });
 
 export type ConfigServidor = z.infer<typeof servidorSchema>;
