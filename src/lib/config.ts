@@ -36,6 +36,10 @@ const servidorSchema = z.object({
   SMTP_PORTA: inteiro(465),
   SMTP_USUARIO: z.string().optional(),
   SMTP_SENHA: z.string().optional(),
+  // Domínio próprio: com RESEND_API_KEY e EMAIL_REMETENTE (ex.: notas@dominio.com.br) o e-mail sai pelo Resend;
+  // sem os dois, continua pelo Gmail (SMTP).
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_REMETENTE: z.email().optional(),
   // Resposta quando a empresa não tem e-mail no cadastro; vazio usa o SMTP_USUARIO.
   EMAIL_ESCRITORIO: z.string().optional(),
   // Assina o link temporário do WhatsApp; sem ele usa o WORKER_SECRET.
