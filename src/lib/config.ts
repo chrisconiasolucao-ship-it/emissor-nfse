@@ -30,6 +30,23 @@ const servidorSchema = z.object({
   MUNICIPIOS_ALERTA_DIAS: inteiro(30),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   BLOB_STORE_ID: z.string().optional(),
+  // Envio da nota ao tomador por e-mail: Gmail do escritório (SMTP com senha de app do Google).
+  // Sem SMTP_USUARIO/SMTP_SENHA o botão de e-mail avisa que falta configurar.
+  SMTP_HOST: z.string().default("smtp.gmail.com"),
+  SMTP_PORTA: inteiro(465),
+  SMTP_USUARIO: z.string().optional(),
+  SMTP_SENHA: z.string().optional(),
+  // Domínio próprio: com RESEND_API_KEY e EMAIL_REMETENTE (ex.: notas@dominio.com.br) o e-mail sai pelo Resend;
+  // sem os dois, continua pelo Gmail (SMTP).
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_REMETENTE: z.email().optional(),
+  // Resposta quando a empresa não tem e-mail no cadastro; vazio usa o SMTP_USUARIO.
+  EMAIL_ESCRITORIO: z.string().optional(),
+  // Assina o link temporário do WhatsApp; sem ele usa o WORKER_SECRET.
+  ENVIO_LINK_SECRET: z.string().min(32).optional(),
+  // IBS/CBS do Simples na DPS (NT 009): desligado até a Receita liberar; "grupo" manda só o grupo IBSCBS
+  // (esquema atual), "completo" manda também regApIBSCBSSN e cAtvSN (Release 4).
+  NFSE_IBSCBS_SIMPLES: z.enum(["desligado", "grupo", "completo"]).default("desligado"),
 });
 
 export type ConfigServidor = z.infer<typeof servidorSchema>;

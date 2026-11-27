@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { dinheiro, lerValor } from "@/lib/money";
+import { lerPercentual, TRIBUTOS_RETIDOS, type PercentuaisRetencao } from "@/lib/nfse/retencoes";
 import { COLUNAS, type ChaveColuna } from "./modelo-planilha";
 
 /**
@@ -25,6 +26,8 @@ export type LinhaNota = {
   competencia: string; // AAAA-MM-01
   issRetido: boolean;
   aliquotaIss: string | null;
+  /** percentuais retidos pelo tomador (colunas ret_inss, ret_irrf, ret_csll, ret_pis, ret_cofins) */
+  retencoes: PercentuaisRetencao;
 };
 
 export type ErroLinha = { linha: number; campo: string; mensagem: string };
@@ -168,6 +171,16 @@ function validarLinha(n: number, b: Bruta, erros: ErroLinha[]): LinhaNota | null
     }
   }
 
+  const retencoes: PercentuaisRetencao = {};
+  for (const t of TRIBUTOS_RETIDOS) {
+    const bruto = b[`ret_${t}` as ChaveColuna];
+    try {
+      retencoes[t] = lerPercentual(typeof bruto === "number" ? bruto : texto(bruto));
+    } catch {
+      erro(`ret_${t}`, "percentual maior que 0 e menor que 100, com até 2 casas (deixe vazio se não houver)");
+    }
+  }
+
   const cep = so(texto(b.tomador_cep));
   const codMun = so(texto(b.tomador_cod_municipio));
   const logradouro = texto(b.tomador_logradouro);
@@ -204,6 +217,7 @@ function validarLinha(n: number, b: Bruta, erros: ErroLinha[]): LinhaNota | null
     competencia: competencia!,
     issRetido,
     aliquotaIss: aliquota,
+    retencoes,
   };
 }
 

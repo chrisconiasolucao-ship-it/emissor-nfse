@@ -394,7 +394,11 @@ export async function gerarDanfse(xml: string, opts: { nomeMunicipio?: NomeMunic
   const vPis = txt(piscofins.vPis);
   const vCofins = txt(piscofins.vCofins);
   const vCsll = txt(tribFed.vRetCSLL);
-  const contribRetidas = tpRetPC === "1" ? [vCsll, vPis, vCofins].reduce((s, v) => s.plus(lerValor(v ?? "0")), lerValor("0")).toFixed(2) : vCsll;
+  // soma o que o tpRetPisCofins diz que foi retido (PIS, COFINS e CSLL)
+  const pisRet = ["1", "3", "4", "5", "9"].includes(tpRetPC ?? "");
+  const cofinsRet = ["1", "3", "4", "6", "7"].includes(tpRetPC ?? "");
+  const partesRet = [vCsll, pisRet ? vPis : null, cofinsRet ? vCofins : null];
+  const contribRetidas = partesRet.some((v) => v) ? partesRet.reduce((s, v) => s.plus(lerValor(v ?? "0")), lerValor("0")).toFixed(2) : null;
   d.campo("IRRF", moeda(txt(tribFed.vRetIRRF)), COL[1]!, L1);
   d.campo("Contribuição Previdenciária - Retida", moeda(txt(tribFed.vRetCP)), COL[2]!, L1);
   d.campo("Contribuições Sociais - Retidas", moeda(contribRetidas), COL[3]!, L1);
@@ -414,7 +418,16 @@ export async function gerarDanfse(xml: string, opts: { nomeMunicipio?: NomeMunic
   const gCBS = no(totCIBS.gCBS);
   d.linhaDivisoria(d.y);
   d.tituloBloco("Tributação IBS / CBS");
-  if (Object.keys(ibscbs).length) {
+  const gTribSN = no(totCIBS.gTribSN);
+  const tribDps = no(no(no(dps.IBSCBS).valores).trib);
+  if (Object.keys(gTribSN).length) {
+    // Simples Nacional (NT 009): a Sefin calcula IBS e CBS sobre a receita bruta do SN
+    const cst = [txt(tribDps.CST), txt(tribDps.cClassTrib)].filter(Boolean).join(" / ");
+    d.campo("CST / cClassTrib", cst || TRACO, COL[0]!, L1);
+    d.campo("Receita Bruta - Simples Nacional", moeda(txt(no(ibscbs.valores).vReceitaBrutaSN)), COL[1]!, L1);
+    d.campo(`IBS - Simples Nacional${txt(gTribSN.pIBSSN) ? ` (${percentual(txt(gTribSN.pIBSSN))})` : ""}`, moeda(txt(gTribSN.vIBSSN)), COL[2]!, L1);
+    d.campo(`CBS - Simples Nacional${txt(gTribSN.pCBSSN) ? ` (${percentual(txt(gTribSN.pCBSSN))})` : ""}`, moeda(txt(gTribSN.vCBSSN)), COL[3]!, L1);
+  } else if (Object.keys(ibscbs).length) {
     const vIbsCbs = no(ibscbs.valores);
     d.campo("Base de Cálculo Após Exclusões e Reduções", moeda(txt(vIbsCbs.vBC)), COL[1]!, L1);
     d.campo("Valor Total Apurado - IBS", moeda(txt(gIBS.vIBSTot)), COL[2]!, L1);
@@ -431,7 +444,11 @@ export async function gerarDanfse(xml: string, opts: { nomeMunicipio?: NomeMunic
   d.campo("Desconto Incondicionado", moeda(txt(descontos.vDescIncond)), COL[2]!, L1);
   d.campo("Desconto Condicionado", moeda(txt(descontos.vDescCond)), COL[3]!, L1);
   d.y += 0.69;
-  const totIbsCbs = txt(gIBS.vIBSTot) || txt(gCBS.vCBS) ? lerValor(txt(gIBS.vIBSTot) ?? "0").plus(lerValor(txt(gCBS.vCBS) ?? "0")).toFixed(2) : null;
+  const totIbsCbs = txt(gIBS.vIBSTot) || txt(gCBS.vCBS)
+    ? lerValor(txt(gIBS.vIBSTot) ?? "0").plus(lerValor(txt(gCBS.vCBS) ?? "0")).toFixed(2)
+    : txt(gTribSN.vIBSSN) || txt(gTribSN.vCBSSN)
+      ? lerValor(txt(gTribSN.vIBSSN) ?? "0").plus(lerValor(txt(gTribSN.vCBSSN) ?? "0")).toFixed(2)
+      : null;
   d.campo("Total das Retenções (ISSQN / Federais)", moeda(txt(valoresNfse.vTotalRet)), COL[0]!, L1);
   d.campo("Valor Líquido da NFS-e", moeda(txt(valoresNfse.vLiq)), COL[1]!, L1);
   d.campo("Total do IBS/CBS", moeda(totIbsCbs), COL[2]!, L1);

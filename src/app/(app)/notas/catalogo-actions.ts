@@ -30,3 +30,32 @@ export async function descricaoCodigo(tabela: "cod_tributacao_nacional" | "nbs",
   const { data } = await db.from(tabela).select("descricao").eq("codigo", codigo).maybeSingle();
   return data?.descricao ?? null;
 }
+
+export type OpcoesIbsCbs = {
+  /** correlação oficial para o código + NBS (vazia quando não há NBS ou correlação) */
+  correlacao: { indOp: string; cClassTrib: string }[];
+  cclasstrib: Opcao[];
+  indop: Opcao[];
+  atividades: Opcao[];
+};
+
+/** Listas do IBS/CBS para o cadastro do serviço (NT 009). Sem a correlação, mostra as tabelas inteiras. */
+export async function opcoesIbsCbs(codTribNac: string, nbs: string): Promise<OpcoesIbsCbs> {
+  const db = await supabaseServidor();
+  let correlacao: OpcoesIbsCbs["correlacao"] = [];
+  if (/^\d{6}$/.test(codTribNac) && /^\d{9}$/.test(nbs)) {
+    const { data } = await db.from("correlacao_ibscbs").select("ind_op, cclasstrib").in("item", itensDoCodigo(codTribNac)).eq("nbs", nbs);
+    correlacao = (data ?? []).map((c) => ({ indOp: String(c.ind_op), cClassTrib: String(c.cclasstrib) }));
+  }
+  const [cc, io, at] = await Promise.all([
+    db.from("cclasstrib").select("codigo, nome").order("codigo"),
+    db.from("indop_ibscbs").select("codigo, local_incidencia, tipo_operacao").order("codigo"),
+    db.from("atividade_simples").select("codigo, anexo, descricao").order("codigo"),
+  ]);
+  return {
+    correlacao,
+    cclasstrib: (cc.data ?? []).map((c) => ({ codigo: String(c.codigo), descricao: String(c.nome) })),
+    indop: (io.data ?? []).map((c) => ({ codigo: String(c.codigo), descricao: `${String(c.tipo_operacao)} · ${String(c.local_incidencia)}` })),
+    atividades: (at.data ?? []).map((c) => ({ codigo: String(c.codigo), descricao: `Anexo ${String(c.anexo)} · ${String(c.descricao)}` })),
+  };
+}

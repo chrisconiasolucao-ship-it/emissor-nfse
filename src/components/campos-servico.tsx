@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { CamposIbsCbsServico, type ValoresIbsCbsServico } from "@/components/campos-ibscbs-servico";
 import { ComboBusca } from "@/components/combo-busca";
 import { buscarCodigosTributacao, descricaoCodigo, nbsDoCodigo, type Opcao } from "@/app/(app)/notas/catalogo-actions";
 
@@ -10,7 +11,7 @@ const rotulo = (o: Opcao) => `${o.codigo} — ${o.descricao}`;
  * Código de tributação nacional (busca pela descrição ou pelo código) e NBS (lista só as NBS aceitas para o
  * código escolhido, pela correlação item × NBS; com uma só, já vem marcada).
  */
-export function CamposServico({ codigo, nbs }: { codigo?: string; nbs?: string }) {
+export function CamposServico({ codigo, nbs, ibscbs }: { codigo?: string; nbs?: string; /** mostra os campos de IBS/CBS (cadastro do serviço) */ ibscbs?: ValoresIbsCbsServico }) {
   const [texto, setTexto] = useState(codigo ?? "");
   const [cod, setCod] = useState(codigo ?? "");
   const [opcoes, setOpcoes] = useState<Opcao[]>([]);
@@ -64,6 +65,7 @@ export function CamposServico({ codigo, nbs }: { codigo?: string; nbs?: string }
           {nbsOpcoes.map((o) => <option key={o.codigo} value={o.codigo}>{rotulo(o)}</option>)}
         </select>
       </label>
+      {ibscbs && <CamposIbsCbsServico codigo={cod} nbs={nbsEscolhida} valores={ibscbs} />}
     </>
   );
 }

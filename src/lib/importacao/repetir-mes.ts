@@ -1,3 +1,5 @@
+import { camposFiscaisNota, percentuaisDaLinha, type PercentuaisRetencao } from "@/lib/nfse/retencoes";
+
 /**
  * Repetir o mês anterior (AT-020): um rascunho por nota AUTORIZADA da empresa na competência anterior,
  * com a competência atual. Rodar de novo para o mesmo mês não duplica: a importação do tipo
@@ -14,6 +16,7 @@ export type NotaAutorizada = {
   valorServico: string;
   issRetido: boolean;
   aliquotaIss: string | null;
+  retencoes?: PercentuaisRetencao;
 };
 
 export type Rascunho = Omit<NotaAutorizada, "id"> & { competencia: string; origem: "repeticao"; notaModeloId: string };
@@ -43,7 +46,7 @@ export async function repetirMes(db: Db, empresaId: string, competencia: string,
   const anterior = mesAnterior(competencia);
   const { data: notas, error } = await db
     .from("nota")
-    .select("id, tomador_id, servico_id, codigo_tributacao_nacional, codigo_nbs, descricao, cod_municipio_prestacao, valor_servico, iss_retido, aliquota_iss")
+    .select("id, tomador_id, servico_id, codigo_tributacao_nacional, codigo_nbs, descricao, cod_municipio_prestacao, valor_servico, iss_retido, aliquota_iss, pct_ret_inss, pct_ret_irrf, pct_ret_csll, pct_ret_pis, pct_ret_cofins")
     .eq("empresa_id", empresaId)
     .eq("competencia", anterior)
     .eq("situacao", "autorizada")
@@ -72,6 +75,7 @@ export async function repetirMes(db: Db, empresaId: string, competencia: string,
       valorServico: String(n.valor_servico),
       issRetido: Boolean(n.iss_retido),
       aliquotaIss: n.aliquota_iss == null ? null : String(n.aliquota_iss),
+      retencoes: percentuaisDaLinha(n),
     })),
     competencia,
   );
@@ -91,6 +95,7 @@ export async function repetirMes(db: Db, empresaId: string, competencia: string,
       valor_servico: r.valorServico,
       iss_retido: r.issRetido,
       aliquota_iss: r.aliquotaIss,
+      ...camposFiscaisNota({ valorServico: r.valorServico, issRetido: r.issRetido, aliquotaIss: r.aliquotaIss, pct: r.retencoes ?? {} }),
       importacao_id: imp.data.id,
       criado_por: usuarioId,
     })),

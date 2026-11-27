@@ -36,6 +36,12 @@ const empresaSchema = z.object({
     .transform((v) => (!v ? null : v.includes(",") ? v.replace(/\./g, "").replace(",", ".") : v))
     .refine((v) => v === null || (/^\d{1,2}(\.\d{1,2})?$/.test(v)), "alíquota do Simples de 0 a 99,99%")
     .transform((v) => (v === null ? null : Number(v))),
+  // ISS fixo (sociedade de profissionais): DPS com regEspTrib 6, sem alíquota e sem ISS retido
+  regime_iss: z.enum(["normal", "sociedade_profissionais"]).default("normal"),
+  // IBS/CBS do Simples (NT 009): regApIBSCBSSN e cAtvSN padrão
+  regime_ibscbs_sn: z.coerce.number().int().min(1).max(3).default(1),
+  cativ_sn: z.string().trim().optional().transform((v) => v || null)
+    .refine((v) => v === null || /^\d{2}$/.test(v), "escolha a atividade do Simples na lista"),
 });
 
 export async function salvarEmpresa(_: Estado, form: FormData): Promise<Estado> {

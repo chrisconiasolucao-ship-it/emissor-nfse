@@ -59,6 +59,14 @@ export type ServicoNovo = {
   aliquota_iss: string | null;
   valor_padrao?: string | null;
   nome?: string | null;
+  pct_ret_inss?: string | null;
+  pct_ret_irrf?: string | null;
+  pct_ret_csll?: string | null;
+  pct_ret_pis?: string | null;
+  pct_ret_cofins?: string | null;
+  cclasstrib?: string | null;
+  cind_op?: string | null;
+  cativ_sn?: string | null;
   origem: OrigemCadastro | "manual";
 };
 

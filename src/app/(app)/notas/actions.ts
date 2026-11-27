@@ -16,6 +16,7 @@ import { dinheiro, lerValor } from "@/lib/money";
 import { type CodigoCancelamento } from "@/lib/nfse/evento-builder";
 import { aprenderDaNfse, guardarServico } from "@/lib/cadastros/aprender";
 import { cancelarNaReceita } from "@/lib/fila/cancelamento";
+import { camposFiscaisNota, lerPercentual, TRIBUTOS_RETIDOS, type PercentuaisRetencao } from "@/lib/nfse/retencoes";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
 
@@ -23,6 +24,21 @@ export type Estado = { ok?: boolean; erro?: string; confirmar?: string; mensagem
 
 const txt = (max = 255) => z.string().trim().max(max);
 const opc = (max = 255) => z.string().trim().max(max).optional().transform((v) => (v ? v : null));
+
+const pctOpc = z
+  .string()
+  .trim()
+  .max(10)
+  .optional()
+  .refine((v) => {
+    try {
+      lerPercentual(v);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "percentual de retenção precisa ser maior que 0, menor que 100 e ter até 2 casas")
+  .transform((v) => lerPercentual(v));
 
 const notaSchema = z
   .object({
@@ -52,6 +68,11 @@ const notaSchema = z
     competencia: txt(7).regex(/^\d{4}-\d{2}$/, "competência AAAA-MM"),
     iss_retido: z.string().optional().transform((v) => v === "on" || v === "true"),
     aliquota_iss: opc(10),
+    ret_inss: pctOpc,
+    ret_irrf: pctOpc,
+    ret_csll: pctOpc,
+    ret_pis: pctOpc,
+    ret_cofins: pctOpc,
     origem: z.enum(["avulsa", "modelo"]).default("avulsa"),
     documento_origem_id: z.uuid().optional().or(z.literal("").transform(() => undefined)),
     nota_substituida_id: z.uuid().optional().or(z.literal("").transform(() => undefined)),
@@ -113,6 +134,18 @@ export async function salvarNota(_: Estado, form: FormData): Promise<Estado> {
   });
   const valor = dinheiro(d.valor);
   const competencia = `${d.competencia}-01`;
+  const { data: emp } = await db.from("empresa").select("regime_iss").eq("id", d.empresa_id).single();
+  if (emp?.regime_iss === "sociedade_profissionais" && d.iss_retido) {
+    return { erro: "Esta empresa tem ISS fixo (sociedade de profissionais): o tomador não retém ISS. Desmarque o ISS retido." };
+  }
+  const pct: PercentuaisRetencao = {};
+  for (const t of TRIBUTOS_RETIDOS) pct[t] = d[`ret_${t}`];
+  let fiscais;
+  try {
+    fiscais = camposFiscaisNota({ valorServico: valor, issRetido: d.iss_retido, aliquotaIss: d.iss_retido ? d.aliquota_iss : null, pct });
+  } catch (e) {
+    return { erro: e instanceof Error ? e.message : String(e) };
+  }
   // serviço novo digitado na nota entra no cadastro (sem duplicar código + descrição)
   if (d.guardar_servico && !d.servico_id) {
     await guardarServico(db, d.empresa_id, {
@@ -122,6 +155,7 @@ export async function salvarNota(_: Estado, form: FormData): Promise<Estado> {
       cod_municipio_prestacao: d.cod_municipio_prestacao,
       iss_retido: d.iss_retido,
       aliquota_iss: d.iss_retido ? lerValor(d.aliquota_iss!).toFixed(2) : null,
+      ...Object.fromEntries(TRIBUTOS_RETIDOS.map((t) => [`pct_ret_${t}`, pct[t] ?? null])),
       valor_padrao: valor,
       origem: "nota",
     }).catch((e) => console.error(JSON.stringify({ acao: "guardar_servico", erro: e instanceof Error ? e.message : String(e) })));
@@ -139,6 +173,7 @@ export async function salvarNota(_: Estado, form: FormData): Promise<Estado> {
     competencia,
     iss_retido: d.iss_retido,
     aliquota_iss: d.iss_retido ? lerValor(d.aliquota_iss!).toFixed(2) : null,
+    ...fiscais,
     documento_origem_id: d.documento_origem_id ?? null,
     codigo_motivo_substituicao: d.codigo_motivo_substituicao ?? null,
     motivo_substituicao: d.motivo_substituicao,
@@ -266,7 +301,11 @@ export async function importarPlanilha(_: Estado, form: FormData): Promise<Estad
   const imp = await admin.from("importacao").insert({ empresa_id: empresaId, tipo: "planilha", documento_id: doc.data.id, linhas: lida.linhas.length, criado_por: perfil.usuarioId }).select("id").single();
   if (imp.error) return { erro: imp.error.code === "23505" ? "Esta planilha já foi importada. Nada novo foi importado." : imp.error.message };
 
-  const { data: emp } = await admin.from("empresa").select("cod_municipio").eq("id", empresaId).single();
+  const { data: emp } = await admin.from("empresa").select("cod_municipio, regime_iss").eq("id", empresaId).single();
+  if (emp?.regime_iss === "sociedade_profissionais") {
+    const l = lida.linhas.find((x) => x.issRetido);
+    if (l) return { erro: `Linha ${l.linha}: esta empresa tem ISS fixo e o tomador não retém ISS. Use N em iss_retido. Nada foi enviado para a fila.` };
+  }
   const db = await supabaseServidor();
   let criadas = 0;
   for (const l of lida.linhas) {
@@ -286,6 +325,7 @@ export async function importarPlanilha(_: Estado, form: FormData): Promise<Estad
         competencia: l.competencia,
         iss_retido: l.issRetido,
         aliquota_iss: l.aliquotaIss,
+        ...camposFiscaisNota({ valorServico: l.valorServico, issRetido: l.issRetido, aliquotaIss: l.aliquotaIss, pct: l.retencoes }),
         documento_origem_id: doc.data.id,
         importacao_id: imp.data.id,
         criado_por: perfil.usuarioId,

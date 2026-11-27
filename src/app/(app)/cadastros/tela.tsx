@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EXEMPLO_RETENCAO, ROTULO_RETENCAO, TRIBUTOS_RETIDOS } from "@/lib/nfse/retencoes";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { CamposServico } from "@/components/campos-servico";
 import { EscolhaEmpresa } from "@/components/escolha-empresa";
@@ -178,12 +179,16 @@ export async function TelaCadastros({ aba, p }: { aba: "tomadores" | "servicos";
             <input type="hidden" name="empresa_id" value={empresaId} />
             {edicao && <input type="hidden" name="id" value={s(e.id)} />}
             <label className="largo">Nome curto (para achar na lista)<input name="nome" defaultValue={s(e.nome)} placeholder="ex.: Honorários mensais" maxLength={120} /></label>
-            <CamposServico codigo={s(e.codigo_tributacao_nacional) || undefined} nbs={s(e.codigo_nbs) || undefined} />
+            <CamposServico codigo={s(e.codigo_tributacao_nacional) || undefined} nbs={s(e.codigo_nbs) || undefined} ibscbs={{ cclasstrib: s(e.cclasstrib), cindOp: s(e.cind_op), cativSn: s(e.cativ_sn) }} />
             <label className="largo">Descrição que vai na nota<textarea name="descricao" defaultValue={s(e.descricao)} required maxLength={2000} /></label>
             <label>Município da prestação<CampoMunicipio name="cod_municipio_prestacao" codigo={s(e.cod_municipio_prestacao)} /><span className="suave">Em branco: o da empresa.</span></label>
             <label>Valor sugerido (R$)<input name="valor_padrao" defaultValue={s(e.valor_padrao).replace(".", ",")} inputMode="decimal" /></label>
             <label>ISS retido pelo tomador<input name="iss_retido" type="checkbox" defaultChecked={Boolean(e.iss_retido)} /></label>
             <label>Alíquota ISS (%) se retido<input name="aliquota_iss" defaultValue={s(e.aliquota_iss).replace(".", ",")} inputMode="decimal" /></label>
+            <p className="suave largo" style={{ margin: 0 }}>Retenções federais pelo tomador (%). Deixe vazio o que não for retido.</p>
+            {TRIBUTOS_RETIDOS.map((t) => (
+              <label key={t}>{ROTULO_RETENCAO[t]} (%)<input name={`ret_${t}`} defaultValue={s(e[`pct_ret_${t}`]).replace(".", ",")} inputMode="decimal" placeholder={`ex.: ${EXEMPLO_RETENCAO[t]}`} /></label>
+            ))}
           </Formulario>
           {edicao && (
             <div className="janela-pe">
