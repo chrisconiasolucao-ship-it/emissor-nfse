@@ -346,3 +346,6 @@ form.em-linha .acoes { width: auto; }
 button.link { background: none; border: 0; padding: 0; color: var(--primaria); text-decoration: underline; font: inherit; cursor: pointer; min-height: 0; }
 @keyframes gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .carregando::before, .giro { animation-duration: 2.4s; } }
+.selo.na_fila::before, .selo.enviando::before { animation: pulsa 1.2s ease-in-out infinite; }
+@keyframes pulsa { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .selo.na_fila::before, .selo.enviando::before { animation: none; } }

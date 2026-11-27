@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AcompanharNota } from "@/components/acompanhar-nota";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { diasParaVencer } from "@/lib/crypto/pfx";
@@ -77,6 +78,8 @@ export default async function Painel() {
       {empresa.pausada && <div className="msg alerta">Emissão pausada{empresa.motivo_pausa ? `: ${empresa.motivo_pausa}` : ""}. <Link href={`/empresas/${id}`}>Ver no cadastro</Link></div>}
       {!cert && <div className="msg alerta">Esta empresa não tem certificado A1: a emissão fica parada. <Link href={`/empresas/${id}`}>Enviar certificado</Link></div>}
       {dias !== null && dias <= 30 && <div className="msg alerta">O certificado vence em {dias} {dias === 1 ? "dia" : "dias"}. <Link href={`/empresas/${id}`}>Trocar certificado</Link></div>}
+
+      {t.fila > 0 && <AcompanharNota texto={`${t.fila} ${t.fila === 1 ? "nota na fila ou enviando" : "notas na fila ou enviando"} para a Receita. O painel atualiza sozinho.`} />}
 
       <div className="indicadores">
         <div className="indicador destaque">
