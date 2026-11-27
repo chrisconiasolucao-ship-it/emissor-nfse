@@ -215,6 +215,14 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           key={JSON.stringify(p)}
           acao={salvarNota}
           className="grade"
+          id="form-nota"
+          lateralEm="resumo-acoes"
+          lateral={
+            <>
+              <button type="submit" form="form-nota" name="acao" value="emitir">Emitir</button>
+              <button type="submit" form="form-nota" name="acao" value="rascunho" className="secundario">Salvar rascunho</button>
+            </>
+          }
           botao={
             <>
               <button type="submit" name="acao" value="emitir">Emitir</button>
@@ -291,7 +299,7 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           <div className="linha"><span className="suave">ISS</span><span>{issFixo ? "fixo (sociedade de profissionais)" : retido ? "retido pelo tomador" : "no DAS"}</span></div>
           <div className="linha"><span className="suave">Valor líquido</span><span>{liquido ? reais(liquido) : "—"}</span></div>
           <p className="msg alerta" style={{ margin: 0, fontSize: 13 }} hidden={pronto}>Falta escolher {falta}.</p>
-          <p className="suave" style={{ margin: 0 }} hidden={!pronto}>Os botões Emitir e Salvar rascunho ficam no fim do formulário.</p>
+          <div id="resumo-acoes" hidden={!pronto} />
         </aside>
       </div>
     </>

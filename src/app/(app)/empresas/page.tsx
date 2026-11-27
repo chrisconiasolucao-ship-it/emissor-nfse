@@ -76,6 +76,7 @@ export default async function Empresas() {
           <p>Competência {MESES_LONGOS[mesAtual - 1]} de {atual.slice(0, 4)} · {ativas.length} empresas ativas · visão geral de todas</p>
         </div>
         <div className="acoes">
+          <Link className="botao secundario" href="/empresas/gerenciar">Gerenciar empresas</Link>
           <Link className="botao" href="/empresas/nova">+ Cadastrar empresa</Link>
         </div>
       </div>

@@ -229,8 +229,8 @@ export async function emitirRascunho(_: Estado, form: FormData): Promise<Estado>
   exigir(podeEmitir(perfil, empresaId));
   const r = await enfileirar(await supabaseServidor(), perfil, empresaId, id, form.get("confirmar_duplicidade") === "sim");
   if (r) return r;
-  revalidatePath(`/notas/${id}`);
-  return { ok: true, mensagem: "Nota enviada para a fila de emissão." };
+  revalidatePath("/notas");
+  redirect(`/notas/${id}`);
 }
 
 export async function excluirRascunho(form: FormData): Promise<void> {

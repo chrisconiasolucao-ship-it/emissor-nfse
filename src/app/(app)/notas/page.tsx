@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AcompanharNota } from "@/components/acompanhar-nota";
 import { eEscritorio } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { empresaAtual } from "@/lib/empresa-atual";
@@ -37,7 +38,10 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
   if (f.empresa) q = q.eq("empresa_id", f.empresa);
   if (f.situacao) q = q.eq("situacao", f.situacao);
   if (f.competencia) q = q.eq("competencia", `${f.competencia}-01`);
-  const [{ data }, { data: empresas }] = await Promise.all([q, db.from("empresa").select("id, razao_social").order("razao_social")]);
+  // notas na fila ou enviando no escopo da tela (sem o filtro de situação): enquanto houver, a lista se atualiza sozinha
+  let qf = db.from("nota").select("id", { count: "exact", head: true }).in("situacao", ["na_fila", "enviando"]);
+  if (f.empresa) qf = qf.eq("empresa_id", f.empresa);
+  const [{ data }, { data: empresas }, { count: naFila }] = await Promise.all([q, db.from("empresa").select("id, razao_social").order("razao_social"), qf]);
   const nomeEmpresa = (empresas ?? []).find((e) => e.id === f.empresa)?.razao_social;
   return (
     <>
@@ -48,6 +52,8 @@ export default async function Notas({ searchParams }: { searchParams: Promise<Fi
         </div>
         <div className="acoes"><Link className="botao" href={daAberta ? "/notas/nova" : f.empresa ? `/api/empresa-atual?id=${f.empresa}&para=/notas/nova` : "/empresas"}>+ Nova nota</Link></div>
       </div>
+
+      {(naFila ?? 0) > 0 && <AcompanharNota texto={`${naFila} ${naFila === 1 ? "nota na fila ou enviando" : "notas na fila ou enviando"} para a Receita. A lista atualiza sozinha.`} />}
 
       <nav className="filtros" aria-label="Situação">
         {FILTROS.map(([k, v]) => (

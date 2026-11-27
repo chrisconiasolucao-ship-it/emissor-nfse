@@ -1,8 +1,11 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Estado } from "@/app/(app)/notas/actions";
+
+const semInscricao = () => () => {};
 
 /** Formulário com Server Action e retorno de mensagem (erro, sucesso, confirmação de duplicidade). */
 export function Formulario({
@@ -11,6 +14,9 @@ export function Formulario({
   className,
   botao,
   aoConcluir,
+  id,
+  lateral,
+  lateralEm,
 }: {
   acao: (e: Estado, f: FormData) => Promise<Estado>;
   children: React.ReactNode;
@@ -18,12 +24,27 @@ export function Formulario({
   botao?: React.ReactNode;
   /** Para onde ir quando a ação der certo (ex.: fechar a janela de cadastro e voltar à lista). */
   aoConcluir?: string;
+  /** id do form, para botões de fora (atributo form) enviarem por ele. */
+  id?: string;
+  /** Botões repetidos noutro lugar da tela (ex.: no Resumo), levados para o elemento lateralEm; ficam desativados enquanto envia. */
+  lateral?: React.ReactNode;
+  lateralEm?: string;
 }) {
   const [estado, enviar, pendente] = useActionState(acao, {});
   const router = useRouter();
   useEffect(() => { if (estado.ok && aoConcluir) { router.replace(aoConcluir, { scroll: false }); router.refresh(); } }, [estado, aoConcluir, router]);
+  // o elemento de destino só existe no navegador; no servidor fica null e os botões laterais aparecem após hidratar
+  const alvo = useSyncExternalStore(semInscricao, () => (lateralEm ? document.getElementById(lateralEm) : null), () => null);
   return (
-    <form action={enviar} className={className}>
+    <form action={enviar} className={className} id={id}>
+      {alvo && lateral && createPortal(
+        <fieldset className="botoes-lateral" disabled={pendente}>
+          {lateral}
+          {pendente && <span className="suave carregando">Enviando…</span>}
+          {(estado.erro || estado.confirmar || (estado.erros?.length ?? 0) > 0) && !pendente && <span className="msg erro">Veja o aviso no fim do formulário.</span>}
+        </fieldset>,
+        alvo,
+      )}
       {children}
       {estado.confirmar && (
         <div className="msg alerta largo">
