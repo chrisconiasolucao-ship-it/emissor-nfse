@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CampoMunicipio } from "@/components/campo-municipio";
+import { CamposIbsCbsEmpresa } from "@/components/campos-ibscbs-empresa";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio, podeCriarUsuario } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
@@ -62,6 +63,7 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
             <label>Série da DPS<input name="serie_dps" defaultValue={e.serie_dps} /></label>
             <label>Alíquota do Simples (%)<input name="aliquota_simples" inputMode="decimal" placeholder="ex.: 6,00" defaultValue={e.aliquota_simples ?? ""} /><span className="suave">ME/EPP: vai na nota como percentual aproximado de tributos.</span></label>
             <label>Regime do ISS<select name="regime_iss" defaultValue={e.regime_iss ?? "normal"}><option value="normal">Normal (ISS pela alíquota, no DAS ou retido)</option><option value="sociedade_profissionais">ISS fixo · sociedade de profissionais</option></select><span className="suave">ISS fixo: a nota sai sem alíquota e sem ISS retido.</span></label>
+            <CamposIbsCbsEmpresa regime={e.regime_ibscbs_sn} cativSn={e.cativ_sn} />
           </Formulario>
         ) : (
           <p>{e.cnpj} · {e.regime} · município {e.cod_municipio}</p>

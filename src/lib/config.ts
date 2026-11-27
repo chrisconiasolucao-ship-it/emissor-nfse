@@ -44,6 +44,9 @@ const servidorSchema = z.object({
   EMAIL_ESCRITORIO: z.string().optional(),
   // Assina o link temporário do WhatsApp; sem ele usa o WORKER_SECRET.
   ENVIO_LINK_SECRET: z.string().min(32).optional(),
+  // IBS/CBS do Simples na DPS (NT 009): desligado até a Receita liberar; "grupo" manda só o grupo IBSCBS
+  // (esquema atual), "completo" manda também regApIBSCBSSN e cAtvSN (Release 4).
+  NFSE_IBSCBS_SIMPLES: z.enum(["desligado", "grupo", "completo"]).default("desligado"),
 });
 
 export type ConfigServidor = z.infer<typeof servidorSchema>;

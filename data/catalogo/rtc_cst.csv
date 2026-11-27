@@ -1,0 +1,19 @@
+codigo,descricao,exige_gibscbs
+000,Tributação integral,1
+010,Tributação com alíquotas uniformes,1
+011,Tributação com alíquotas uniformes reduzidas,1
+200,Alíquota reduzida,1
+220,Alíquota fixa,1
+221,Alíquota fixa proporcional,1
+222,Redução de Base de Cálculo,1
+400,Isenção,0
+410,Imunidade e não incidência,0
+510,Diferimento,1
+515,Diferimento com redução de alíquota,1
+550,Suspensão,1
+620,Tributação monofásica,0
+800,Transferência de crédito,0
+810,Ajustes de IBS na ZFM,0
+811,Ajustes,0
+820,Tributação em documento específico,0
+830,Exclusão de base de cálculo,1

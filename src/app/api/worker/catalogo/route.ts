@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ erro: "não autorizado" }, { status: 401 });
   }
   const db = supabaseAdmin();
-  const carregar = async (tabela: string, linhas: Record<string, string>[], chave: string) => {
+  const carregar = async (tabela: string, linhas: Record<string, string | number | boolean | null>[], chave: string) => {
     for (let i = 0; i < linhas.length; i += 500) {
       const { error } = await db.from(tabela).upsert(linhas.slice(i, i + 500), { onConflict: chave });
       if (error) throw new Error(`${tabela}: ${error.message}`);
@@ -28,6 +28,11 @@ export async function POST(req: Request) {
       nbs: await carregar("nbs", catalogo.nbs.map(([codigo, descricao]) => ({ codigo, descricao })), "codigo"),
       ind_operacao: await carregar("ind_operacao", catalogo.indop.map(([codigo, descricao]) => ({ codigo, descricao })), "codigo"),
       correlacao_item_nbs: await carregar("correlacao_item_nbs", catalogo.correlacao.map(([item, nbs, ind_op, cclasstrib]) => ({ item, nbs, ind_op, cclasstrib })), "item,nbs"),
+      cst_ibscbs: await carregar("cst_ibscbs", catalogo.rtcCst.map(([codigo, descricao, exige_gibscbs]) => ({ codigo, descricao, exige_gibscbs })), "codigo"),
+      cclasstrib: await carregar("cclasstrib", catalogo.rtcCclasstrib.map(([codigo, cst, nome, tp_rbsn, inicio_vigencia]) => ({ codigo, cst, nome, tp_rbsn, inicio_vigencia })), "codigo"),
+      indop_ibscbs: await carregar("indop_ibscbs", catalogo.rtcIndop.map(([codigo, local_incidencia, tipo_operacao, inicio_vigencia]) => ({ codigo, local_incidencia, tipo_operacao, inicio_vigencia })), "codigo"),
+      correlacao_ibscbs: await carregar("correlacao_ibscbs", catalogo.rtcCorrelacao.map(([item, nbs, ind_op, cclasstrib, inicio_vigencia]) => ({ item, nbs, ind_op, cclasstrib, inicio_vigencia })), "item,nbs,ind_op,cclasstrib"),
+      atividade_simples: await carregar("atividade_simples", catalogo.rtcAtividadeSn.map(([codigo, anexo, descricao]) => ({ codigo, anexo, descricao })), "codigo"),
     };
     await auditar(db, { empresaId: null, acao: "carregar_catalogo", entidade: "catalogo", entidadeId: null, depois: r, quem: null });
     return NextResponse.json(r);
