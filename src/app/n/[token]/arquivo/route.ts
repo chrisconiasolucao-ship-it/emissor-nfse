@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ipDe, logSeguranca } from "@/lib/auditoria/audit";
-import { ArquivoAlterado, arquivosDaNota, baixarConferido, lerNotaParaEnvio, segredoDoLink } from "@/lib/envio/arquivos";
+import { ArquivoAlterado, arquivosDaNota, baixarConferido, lerNotaParaEnvio, registrarAcesso, segredoDoLink } from "@/lib/envio/arquivos";
 import { lerToken } from "@/lib/envio/link";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -27,7 +27,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ token: string }
     }
     return NextResponse.json({ erro: "arquivo indisponível" }, { status: 502 });
   }
-  await logSeguranca(admin, { evento: "download_documento", ip: ipDe(req.headers), empresaId: nota.empresa_id, alvo: `documento:${arq.id}`, detalhe: { tipo: arq.tipo, via: "link_whatsapp" } });
+  await logSeguranca(admin, { evento: "download_documento", ip: ipDe(req.headers), empresaId: nota.empresa_id, alvo: `documento:${arq.id}`, detalhe: { tipo: arq.tipo, via: "link_tomador", envio: lido.envioId } });
+  await registrarAcesso(admin, { empresaId: nota.empresa_id, notaId: nota.id, envioId: lido.envioId, tipo: arq.tipo === "danfse" ? "baixou_danfse" : "baixou_xml", ip: ipDe(req.headers), navegador: req.headers.get("user-agent") });
   const { data: url, error } = await admin.storage.from("documentos").createSignedUrl(arq.storage_path, 60, { download: arq.nome });
   if (error || !url) return NextResponse.json({ erro: "não gerou o link" }, { status: 500 });
   return NextResponse.redirect(url.signedUrl, 302);

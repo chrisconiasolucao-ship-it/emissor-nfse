@@ -88,3 +88,14 @@ export function baseUrl(h: Headers): string {
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   return `${proto}://${host}`;
 }
+
+export type TipoAcesso = "abriu_link" | "baixou_danfse" | "baixou_xml" | "abriu_email";
+
+/** Grava o acesso do tomador. Nunca derruba a resposta: falha de registro só vai para o log. */
+export async function registrarAcesso(admin: SupabaseClient, a: { empresaId: string; notaId: string; envioId: string | null; tipo: TipoAcesso; ip: string | null; navegador: string | null }): Promise<void> {
+  const linha = { empresa_id: a.empresaId, nota_id: a.notaId, envio_id: a.envioId, tipo: a.tipo, ip: a.ip, navegador: a.navegador?.slice(0, 300) ?? null };
+  let { error } = await admin.from("envio_acesso").insert(linha);
+  // envio que não chegou a ser gravado (ex.: link de WhatsApp gerado e não usado): guarda só a nota
+  if (error?.code === "23503" && a.envioId) ({ error } = await admin.from("envio_acesso").insert({ ...linha, envio_id: null }));
+  if (error) console.error("registrarAcesso", a.tipo, error);
+}

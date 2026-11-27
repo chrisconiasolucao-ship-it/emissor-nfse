@@ -1,11 +1,14 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigir, podeVer } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { config } from "@/lib/config";
-import { arquivosDaNota, baixarConferido, dadosDaNota, lerNotaParaEnvio } from "@/lib/envio/arquivos";
+import { arquivosDaNota, baixarConferido, baseUrl, dadosDaNota, lerNotaParaEnvio, segredoDoLink } from "@/lib/envio/arquivos";
+import { criarToken } from "@/lib/envio/link";
 import { lerEmails, montarEmail, remetente, telefoneWhatsApp } from "@/lib/envio/mensagens";
 import { enviarPorSmtp, FalhaNoEnvio } from "@/lib/envio/smtp";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -45,8 +48,13 @@ export async function enviarNotaPorEmail(_: Estado, form: FormData): Promise<Est
   }
 
   const admin = supabaseAdmin();
+  // o id do envio vai no link do e-mail: aberturas e downloads ficam ligados a este envio
+  const envioId = randomUUID();
+  const token = criarToken(nota.id, await segredoDoLink(), new Date(), undefined, envioId);
+  const base = baseUrl(await headers());
+  const links = { baixar: `${base}/n/${token}`, abertura: `${base}/n/${token}/aberto` };
   const registrar = (situacao: "enviado" | "falhou", extra: { provedor_id?: string; erro?: string }) =>
-    admin.from("envio_nota").insert({ empresa_id: nota.empresa_id, nota_id: nota.id, canal: "email", destinatario: lidos.emails.join(", "), situacao, criado_por: perfil.usuarioId, ...extra });
+    admin.from("envio_nota").insert({ id: envioId, empresa_id: nota.empresa_id, nota_id: nota.id, canal: "email", destinatario: lidos.emails.join(", "), situacao, criado_por: perfil.usuarioId, ...extra });
 
   try {
     const arquivos = await arquivosDaNota(admin, nota);
@@ -54,7 +62,7 @@ export async function enviarNotaPorEmail(_: Estado, form: FormData): Promise<Est
     const anexos = await Promise.all(
       arquivos.map(async (a) => ({ nome: a.nome, conteudo: await baixarConferido(admin, a), tipo: a.tipo === "danfse" ? "application/pdf" : "application/xml" })),
     );
-    const { assunto, html, texto } = montarEmail(dadosDaNota(nota), p.data.mensagem);
+    const { assunto, html, texto } = montarEmail(dadosDaNota(nota), p.data.mensagem, links);
     const id = await enviarPorSmtp(
       { host: c.SMTP_HOST, porta: c.SMTP_PORTA, usuario: c.SMTP_USUARIO, senha: c.SMTP_SENHA },
       { de: remetente(nota.empresa.razao_social, c.SMTP_USUARIO), para: lidos.emails, responderPara: nota.empresa.email || c.EMAIL_ESCRITORIO || null, assunto, html, texto, anexos },
@@ -72,13 +80,13 @@ export async function enviarNotaPorEmail(_: Estado, form: FormData): Promise<Est
 }
 
 /** Registra que o WhatsApp foi aberto com o link da nota (não dá para saber se a pessoa apertou enviar). */
-export async function registrarWhatsApp(id: string, telefone: string): Promise<void> {
+export async function registrarWhatsApp(id: string, envioId: string, telefone: string): Promise<void> {
   const tel = telefoneWhatsApp(telefone);
-  if (!z.uuid().safeParse(id).success || !tel) return;
+  if (!z.uuid().safeParse(id).success || !z.uuid().safeParse(envioId).success || !tel) return;
   const perfil = await perfilAtual();
   const nota = await lerNotaParaEnvio(await supabaseServidor(), id);
   if (!nota || !podeVer(perfil, nota.empresa_id)) return;
-  await supabaseAdmin().from("envio_nota").insert({ empresa_id: nota.empresa_id, nota_id: nota.id, canal: "whatsapp", destinatario: tel, situacao: "link_aberto", criado_por: perfil.usuarioId });
+  await supabaseAdmin().from("envio_nota").insert({ id: envioId, empresa_id: nota.empresa_id, nota_id: nota.id, canal: "whatsapp", destinatario: tel, situacao: "link_aberto", criado_por: perfil.usuarioId });
   await completarTomador(nota.id, nota.empresa_id, "telefone", telefone.trim());
   revalidatePath(`/notas/${nota.id}`);
 }
