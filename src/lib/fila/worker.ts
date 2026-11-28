@@ -64,6 +64,8 @@ export type Portas = {
   registrarSubstituicao(n: NotaNaFila, s: NonNullable<ContextoNota["substitui"]>): Promise<void>;
   /** Nome "Município / UF" pelo código IBGE, para o DANFSe. */
   nomeMunicipio?: NomeMunicipio;
+  /** Logo da empresa para o DANFSe (null = só a logomarca da NFS-e). */
+  logoEmpresa?(empresaId: string): Promise<Uint8Array | null>;
 };
 
 export class SemCertificado extends Error {
@@ -158,7 +160,7 @@ export async function processarNota(p: Portas, n: NotaNaFila): Promise<Resultado
     const xmlDoc = await p.guardarDocumento(n, "xml_autorizado", Buffer.from(nfseXml!, "utf8"), "application/xml");
     let danfseDoc: string | null = null;
     try {
-      danfseDoc = await p.guardarDocumento(n, "danfse", await gerarDanfse(nfseXml!, { nomeMunicipio: p.nomeMunicipio }), "application/pdf");
+      danfseDoc = await p.guardarDocumento(n, "danfse", await gerarDanfse(nfseXml!, { nomeMunicipio: p.nomeMunicipio, logoEmpresa: await p.logoEmpresa?.(n.empresaId) }), "application/pdf");
     } catch {
       danfseDoc = null;
     }

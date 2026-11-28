@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       if (!doc) throw new Error("XML autorizado não encontrado");
       const arq = await db.storage.from("documentos").download(String(doc.storage_path));
       if (arq.error || !arq.data) throw new Error(`Storage: ${arq.error?.message}`);
-      const pdf = await gerarDanfse(await arq.data.text(), { nomeMunicipio: portas.nomeMunicipio });
+      const pdf = await gerarDanfse(await arq.data.text(), { nomeMunicipio: portas.nomeMunicipio, logoEmpresa: await portas.logoEmpresa?.(String(n.empresa_id)) });
       const id = await portas.guardarDocumento({ empresaId: String(n.empresa_id), id: String(n.id) } as never, "danfse", pdf, "application/pdf");
       saida.push({ nota: String(n.id), documento: id });
     } catch (e) {

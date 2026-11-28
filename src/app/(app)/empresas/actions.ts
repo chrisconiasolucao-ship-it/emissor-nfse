@@ -1,6 +1,6 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -12,6 +12,7 @@ import { config } from "@/lib/config";
 import { COOKIE_EMPRESA } from "@/lib/empresa-atual";
 import { chaveMestra, cifrarArquivo, cifrarTexto } from "@/lib/crypto/cert-vault";
 import { abrirPfx, CertificadoVencido, exigirValido, SenhaCertificadoInvalida, type CertificadoAberto } from "@/lib/crypto/pfx";
+import { LOGO_TAMANHO_MAX, tipoDaImagem } from "@/lib/empresa/logo";
 import { consultarCnpj, EmpresaForaDoEscopo, sugerirEmpresa, type EmpresaSugerida } from "@/lib/empresa/consulta-cnpj";
 import { cnpjValido } from "@/lib/importacao/planilha";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -114,6 +115,39 @@ async function guardarCertificado(empresaId: string, pfx: Buffer, senha: string,
   await logSeguranca(admin, { evento: "envio_certificado", usuarioId: perfil.usuarioId, email: perfil.email, ip, empresaId, alvo: `certificado:${novo.id}`, detalhe: { titular: aberto.titular, valido_ate: aberto.validoAte.toISOString() } });
   await auditar(admin, { empresaId, acao: "envio_certificado", entidade: "certificado", entidadeId: String(novo.id), depois: { titular: aberto.titular, sha256: aberto.sha256, valido_ate: aberto.validoAte.toISOString() }, quem: perfil.usuarioId, ip });
   return {};
+}
+
+/** Logo da empresa para o PDF da nota (DANFSe): PNG ou JPEG até 500 KB, guardada no Storage pelo servidor. */
+export async function enviarLogo(_: Estado, form: FormData): Promise<Estado> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirEmpresas(perfil), "Só o escritório muda a logo da empresa.");
+  const empresaId = z.uuid().parse(form.get("empresa_id"));
+  const arquivo = form.get("arquivo");
+  if (!(arquivo instanceof File) || arquivo.size === 0) return { erro: "Escolha a imagem da logo (PNG ou JPG)." };
+  if (arquivo.size > LOGO_TAMANHO_MAX) return { erro: "A imagem passa de 500 KB. Diminua o tamanho dela e envie de novo." };
+  const bytes = Buffer.from(await arquivo.arrayBuffer());
+  const tipo = tipoDaImagem(bytes);
+  if (!tipo) return { erro: "A logo precisa ser uma imagem PNG ou JPG." };
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  const caminho = `${empresaId}/logo/logo-${hash.slice(0, 12)}.${tipo}`;
+  const admin = supabaseAdmin();
+  const up = await admin.storage.from("documentos").upload(caminho, bytes, { contentType: tipo === "png" ? "image/png" : "image/jpeg", upsert: false });
+  if (up.error && !/exists|duplicate/i.test(up.error.message)) return { erro: `Não foi possível guardar a imagem: ${up.error.message}` };
+  const { error } = await admin.from("empresa").update({ logo_path: caminho }).eq("id", empresaId);
+  if (error) return { erro: error.message };
+  revalidatePath(`/empresas/${empresaId}`);
+  return { ok: true, mensagem: "Logo salva. As próximas notas já saem com ela." };
+}
+
+/** Tira a logo da empresa: o PDF volta a sair só com a logomarca da NFS-e. */
+export async function removerLogo(_: Estado, form: FormData): Promise<Estado> {
+  const perfil = await perfilAtual();
+  exigir(podeGerirEmpresas(perfil), "Só o escritório muda a logo da empresa.");
+  const empresaId = z.uuid().parse(form.get("empresa_id"));
+  const { error } = await supabaseAdmin().from("empresa").update({ logo_path: null }).eq("id", empresaId);
+  if (error) return { erro: error.message };
+  revalidatePath(`/empresas/${empresaId}`);
+  return { ok: true, mensagem: "Logo retirada. As próximas notas saem com a logomarca da NFS-e." };
 }
 
 /** Envio do pfx (AT-011, AT-013): abre com a senha, confere validade e CNPJ, guarda cifrado. */

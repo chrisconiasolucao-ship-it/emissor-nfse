@@ -73,7 +73,7 @@ export async function cancelarNaReceita(admin: SupabaseClient, d: PedidoCancelar
     const arq = xmlDoc ? await admin.storage.from("documentos").download(String(xmlDoc.storage_path)) : null;
     if (arq?.data) {
       const portas = portasSupabase(admin, "cancelamento");
-      const pdf = await gerarDanfse(await arq.data.text(), { nomeMunicipio: portas.nomeMunicipio, situacao: "cancelada" });
+      const pdf = await gerarDanfse(await arq.data.text(), { nomeMunicipio: portas.nomeMunicipio, situacao: "cancelada", logoEmpresa: await portas.logoEmpresa?.(d.empresaId) });
       await portas.guardarDocumento({ empresaId: d.empresaId, id: d.notaId } as never, "danfse", pdf, "application/pdf");
     }
   } catch (e) {
