@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { Estado } from "@/app/(app)/notas/actions";
 import { exigir, podeEmitir } from "@/lib/auth/permissoes";
@@ -52,6 +53,15 @@ export async function salvarTomador(_: Estado, form: FormData): Promise<Estado> 
   const { id, ...d } = r.data;
   exigir(podeEmitir(perfil, d.empresa_id));
   const db = await supabaseServidor();
+  // cadastro aberto pela Nova nota: grava e volta para a nota com o tomador escolhido
+  const voltar = String(form.get("voltar") ?? "");
+  if (!id && voltar.startsWith("/notas/nova?")) {
+    const { data: novo, error } = await db.from("tomador").insert({ ...d, origem: "manual" }).select("id").single();
+    if (error?.code === "23505") return { erro: "Já existe um tomador com este CPF/CNPJ nesta empresa. Feche a janela e procure por ele na lista." };
+    if (error || !novo) return { erro: error?.message ?? "Não foi possível cadastrar o tomador." };
+    revalidatePath("/tomadores");
+    redirect(`${voltar}&tomador=${novo.id}`);
+  }
   const q = id
     ? db.from("tomador").update(d).eq("empresa_id", d.empresa_id).eq("id", id)
     : db.from("tomador").insert({ ...d, origem: "manual" });
