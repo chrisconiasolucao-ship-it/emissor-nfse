@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CampoCnpj } from "@/components/campo-cnpj";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { CamposIbsCbsEmpresa } from "@/components/campos-ibscbs-empresa";
 import { Formulario } from "@/components/formulario";
@@ -27,7 +28,8 @@ export default async function NovaEmpresa() {
       <h2>Cadastrar à mão</h2>
       <div className="cartao">
         <Formulario acao={salvarEmpresa} className="grade" botao={<button type="submit">Cadastrar</button>}>
-          <label>CNPJ<input name="cnpj" required /></label>
+          <label>CNPJ<CampoCnpj name="cnpj" required municipio="cod_municipio"
+            campos={{ razao_social: "razao_social", nome_fantasia: "nome_fantasia", regime: "regime", cod_municipio: "cod_municipio", email: "email", telefone: "telefone" }} /></label>
           <label className="largo">Razão social<input name="razao_social" required /></label>
           <label>Nome fantasia<input name="nome_fantasia" /></label>
           <label>Regime

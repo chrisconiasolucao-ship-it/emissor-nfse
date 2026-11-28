@@ -344,6 +344,8 @@ form.em-linha .acoes { width: auto; }
 .carregando::before, .giro { content: ""; display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: gira .8s linear infinite; vertical-align: -2px; margin-right: 8px; flex: none; }
 .acompanhar { display: flex; align-items: center; gap: 2px; }
 button.link { background: none; border: 0; padding: 0; color: var(--primaria); text-decoration: underline; font: inherit; cursor: pointer; min-height: 0; }
+.aviso-campo { color: var(--alerta); font-size: 13px; }
+button.link:hover { background: none; color: var(--primaria-escura); }
 @keyframes gira { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .carregando::before, .giro { animation-duration: 2.4s; } }
 .selo.na_fila::before, .selo.enviando::before { animation: pulsa 1.2s ease-in-out infinite; }

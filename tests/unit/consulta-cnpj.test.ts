@@ -55,3 +55,32 @@ describe("consulta do CNPJ com fontes alternativas", () => {
     await expect(consultarCnpj("1", f)).rejects.toThrow(/BrasilAPI HTTP 403, Minha Receita HTTP 403, CNPJ.ws HTTP 403/);
   });
 });
+
+describe("preenchimento do cadastro pelo CNPJ", () => {
+  it("monta endereço, município, contato e regime no formato da BrasilAPI", async () => {
+    const { preenchimentoDoCnpj } = await import("@/lib/empresa/consulta-cnpj");
+    const p = preenchimentoDoCnpj({
+      razao_social: "EMPRESA TESTE LTDA", nome_fantasia: "TESTE", codigo_municipio_ibge: 4301602, porte: "MICRO EMPRESA",
+      opcao_pelo_simples: true, opcao_pelo_mei: false, email: "Contato@Teste.com.br", ddd_telefone_1: "53 3242-1111",
+      descricao_situacao_cadastral: "ATIVA", cep: "96400-000", descricao_tipo_de_logradouro: "RUA", logradouro: "GENERAL OSORIO",
+      numero: "100", complemento: "SALA 2", bairro: "CENTRO",
+    });
+    expect(p).toMatchObject({ razao_social: "EMPRESA TESTE LTDA", cod_municipio: "4301602", cep: "96400000", logradouro: "RUA GENERAL OSORIO",
+      numero: "100", email: "contato@teste.com.br", telefone: "5332421111", regime: "ME", aviso: null });
+  });
+  it("não repete o tipo do logradouro e avisa CNPJ não ativo", async () => {
+    const { preenchimentoDoCnpj } = await import("@/lib/empresa/consulta-cnpj");
+    const p = preenchimentoDoCnpj({ razao_social: "X", descricao_tipo_de_logradouro: "AVENIDA", logradouro: "AVENIDA SETE", descricao_situacao_cadastral: "BAIXADA" });
+    expect(p.logradouro).toBe("AVENIDA SETE");
+    expect(p.cod_municipio).toBe("");
+    expect(p.aviso).toMatch(/BAIXADA/);
+  });
+  it("converte o endereço do CNPJ.ws", async () => {
+    const { consultarCnpj, preenchimentoDoCnpj } = await import("@/lib/empresa/consulta-cnpj");
+    const ws = { razao_social: "Y", estabelecimento: { tipo_logradouro: "Rua", logradouro: "Sete", numero: "5", bairro: "Centro", cep: "96400000",
+      cidade: { ibge_id: 4301602 }, estado: { sigla: "RS" } } };
+    let n = 0;
+    const f = (async () => new Response(JSON.stringify(++n < 3 ? {} : ws), { status: n < 3 ? 503 : 200 })) as unknown as typeof fetch;
+    expect(preenchimentoDoCnpj(await consultarCnpj("11222333000181", f))).toMatchObject({ logradouro: "Rua Sete", numero: "5", bairro: "Centro", cod_municipio: "4301602" });
+  });
+});
