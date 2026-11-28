@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ipDe, logSeguranca } from "@/lib/auditoria/audit";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { empresaAtual } from "@/lib/empresa-atual";
+import { logoDaEmpresa } from "@/lib/empresa/logo";
 import { gerarDanfse } from "@/lib/nfse/danfse";
 import { lerDadosDoLote } from "@/lib/notas/lote-dados";
 import { LIMITE_COM_PDF, LIMITE_XML, montarLote, nomeDoZip, resumoCsv, tipoLote, type ArquivoLote } from "@/lib/notas/lote";
@@ -78,9 +79,10 @@ export async function GET(req: Request) {
     }
     return baixados.get(a.doc.id)!;
   };
+  const logo = pdf ? logoDaEmpresa(admin, empresa.id) : Promise.resolve(null);
   const conteudo = async (a: ArquivoLote): Promise<Buffer> => {
     const buf = await baixar(a);
-    return a.gerarPdf ? gerarDanfse(buf.toString("utf8"), { nomeMunicipio, situacao: a.situacao }) : buf;
+    return a.gerarPdf ? gerarDanfse(buf.toString("utf8"), { nomeMunicipio, situacao: a.situacao, logoEmpresa: await logo }) : buf;
   };
 
   const zip = new EscritorZip();

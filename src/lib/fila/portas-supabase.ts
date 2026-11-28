@@ -5,6 +5,7 @@ import { auditar, logSeguranca } from "@/lib/auditoria/audit";
 import { config } from "@/lib/config";
 import { chaveMestra, decifrarArquivo, decifrarTexto, type Cifrado, type MetaCifra } from "@/lib/crypto/cert-vault";
 import { abrirPfx, exigirValido } from "@/lib/crypto/pfx";
+import { logoDaEmpresa } from "@/lib/empresa/logo";
 import { itensDoCodigo } from "@/lib/catalogo";
 import type { EntradaIbsCbs } from "@/lib/nfse/ibscbs";
 import { SefinClient, agenteMtls, transporteHttps } from "@/lib/nfse/sefin-client";
@@ -193,6 +194,8 @@ export function portasSupabase(db: SupabaseClient, dono: string): Portas {
     sefin(cert) {
       return new SefinClient(c.SEFIN_BASE_URL, transporteHttps(agenteMtls(cert.pfx, cert.senha)));
     },
+
+    logoEmpresa: (empresaId) => logoDaEmpresa(db, empresaId),
 
     async nomeMunicipio(cod) {
       const { data } = await db.from("municipio_situacao").select("nome, uf").eq("cod_ibge", cod).maybeSingle();

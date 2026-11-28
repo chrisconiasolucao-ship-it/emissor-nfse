@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import { PDFDocument, type PDFFont, type PDFPage, StandardFonts, degrees, rgb } from "pdf-lib";
 import QRCode from "qrcode";
 import { lerValor } from "@/lib/money";
+import { LOGO_NFSE_PNG_BASE64 } from "./logo-nfse";
 
 /**
  * DANFSe gerado pelo próprio sistema a partir do XML autorizado, no leiaute da NT 008 SE/CGNFS-e v1.02
@@ -10,6 +11,15 @@ import { lerValor } from "@/lib/money";
  */
 export type SituacaoDanfse = "autorizada" | "cancelada" | "substituida";
 export type NomeMunicipio = (codIbge: string) => Promise<string | null> | string | null;
+/** Onde sai a logo da empresa: ao lado da logomarca da NFS-e (padrão) ou no lugar dela. */
+export type PosicaoLogo = "ao_lado" | "no_lugar";
+export type OpcoesDanfse = {
+  nomeMunicipio?: NomeMunicipio;
+  situacao?: SituacaoDanfse;
+  /** Logo da empresa (PNG ou JPEG). Sem logo, ou se a imagem não abrir, sai só a logomarca da NFS-e. */
+  logoEmpresa?: Uint8Array | null;
+  posicaoLogo?: PosicaoLogo;
+};
 
 const CM = 28.3465;
 const ALTURA_A4 = 841.89;
@@ -190,8 +200,47 @@ class Desenho {
   }
 }
 
+type Imagem = Awaited<ReturnType<PDFDocument["embedPng"]>>;
+
+/** Desenha a imagem dentro da caixa (cm a partir do topo), sem distorcer, centrada na vertical. */
+function encaixar(page: PDFPage, img: Imagem, esq: number, sup: number, largMax: number, altMax: number) {
+  const escala = Math.min((largMax * CM) / img.width, (altMax * CM) / img.height);
+  const w = img.width * escala;
+  const h = img.height * escala;
+  page.drawImage(img, { x: esq * CM, y: ALTURA_A4 - sup * CM - (altMax * CM + h) / 2, width: w, height: h });
+}
+
+/** Abre PNG ou JPEG pela assinatura do arquivo; imagem inválida vira null (o PDF sai sem ela). */
+async function abrirImagem(doc: PDFDocument, bytes: Uint8Array | null): Promise<Imagem | null> {
+  if (!bytes || bytes.length < 4) return null;
+  // cópia própria: o leitor de JPEG do pdf-lib ignora o deslocamento de Buffers que dividem memória
+  bytes = Uint8Array.from(bytes);
+  try {
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return await doc.embedPng(bytes);
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) return await doc.embedJpg(bytes);
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * Cabeçalho, canto esquerdo: logomarca colorida da NFS-e (NT 008 item 2.4.3; tabela 2.4.5: 4,00 x 0,85 cm em 0,49 / 0,44).
+ * Com logo da empresa: "ao_lado" põe a logo dela entre a logomarca e o título; "no_lugar" troca a logomarca pela dela.
+ */
+async function desenharLogos(doc: PDFDocument, page: PDFPage, logoEmpresa: Uint8Array | null, posicao: PosicaoLogo) {
+  const empresa = await abrirImagem(doc, logoEmpresa);
+  if (empresa && posicao === "no_lugar") {
+    encaixar(page, empresa, 0.49, 0.36, 4.6, 1.0);
+    return;
+  }
+  const nfse = await doc.embedPng(Buffer.from(LOGO_NFSE_PNG_BASE64, "base64"));
+  encaixar(page, nfse, 0.49, 0.44, 4.0, 0.85);
+  if (empresa) encaixar(page, empresa, 4.75, 0.36, 3.3, 1.0);
+}
+
 /** Gera o DANFSe (PDF) a partir do XML da NFS-e autorizada. */
-export async function gerarDanfse(xml: string, opts: { nomeMunicipio?: NomeMunicipio; situacao?: SituacaoDanfse } = {}): Promise<Buffer> {
+export async function gerarDanfse(xml: string, opts: OpcoesDanfse = {}): Promise<Buffer> {
   const nomeMun: NomeMunicipio = opts.nomeMunicipio ?? ((c) => c);
   const raiz = no(parser.parse(xml));
   const inf = no(no(raiz.NFSe).infNFSe);
@@ -223,8 +272,7 @@ export async function gerarDanfse(xml: string, opts: { nomeMunicipio?: NomeMunic
 
   // CABEÇALHO
   d.caixa(X0, 0.3, LARGURA, 1.16, true);
-  d.texto("NFS-e", 0.49, 1.15, 18, d.negrito);
-  d.texto("Nota Fiscal de Serviço eletrônica", 0.49, 1.42, 5.5, d.normal);
+  await desenharLogos(doc, page, opts.logoEmpresa ?? null, opts.posicaoLogo ?? "ao_lado");
   d.centro("DANFSe v2.0", 5.41, 10.19, 0.68, 9, d.negrito);
   d.centro("Documento Auxiliar da NFS-e", 5.41, 10.19, 1.02, 9, d.negrito);
   if (tpAmb === "2") d.centro("NFS-e SEM VALIDADE JURÍDICA", 5.41, 10.19, 1.36, 9, d.negrito, VERMELHO);

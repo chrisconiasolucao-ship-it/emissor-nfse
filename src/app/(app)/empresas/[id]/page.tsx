@@ -6,9 +6,10 @@ import { Formulario } from "@/components/formulario";
 import { eEscritorio, podeCriarUsuario } from "@/lib/auth/permissoes";
 import { perfilAtual } from "@/lib/auth/sessao";
 import { diasParaVencer } from "@/lib/crypto/pfx";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { documento } from "@/lib/formato";
-import { alterarAtivaEmpresa, criarUsuario, enviarCertificado, excluirEmpresa, retomarEmpresa, salvarEmpresa } from "../actions";
+import { alterarAtivaEmpresa, criarUsuario, enviarCertificado, enviarLogo, excluirEmpresa, removerLogo, retomarEmpresa, salvarEmpresa } from "../actions";
 
 export default async function Empresa({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,6 +21,10 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
   // AT-011: só metadados do certificado (a coluna do arquivo e da senha não é legível pela tela)
   const { data: cert } = await db.from("certificado").select("titular, cnpj_titular, valido_ate, enviado_em").eq("empresa_id", id).eq("ativo", true).maybeSingle();
   const { data: usuarios } = await db.from("perfil_usuario").select("usuario_id, nome, email, papel, ativo").eq("empresa_id", id).order("nome");
+  // prévia da logo: link assinado curto (o bucket é privado)
+  const logoUrl = escritorio && e.logo_path
+    ? (await supabaseAdmin().storage.from("documentos").createSignedUrl(String(e.logo_path), 600)).data?.signedUrl ?? null
+    : null;
   const dias = cert ? diasParaVencer(new Date(cert.valido_ate)) : null;
   const { count: notas } = escritorio ? await db.from("nota").select("id", { count: "exact", head: true }).eq("empresa_id", id) : { count: 0 };
   return (
@@ -87,6 +92,32 @@ export default async function Empresa({ params }: { params: Promise<{ id: string
           </Formulario>
         )}
       </div>
+
+      {escritorio && (
+        <>
+          <h2>Logo no PDF da nota</h2>
+          <div className="cartao">
+            {logoUrl ? (
+              <p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoUrl} alt="Logo da empresa" style={{ maxHeight: 60, maxWidth: 240, display: "block", marginBottom: 6 }} />
+                <span className="suave">Sai no cabeçalho do PDF, ao lado da logomarca da NFS-e.</span>
+              </p>
+            ) : (
+              <p className="suave">Sem logo: o PDF sai só com a logomarca colorida da NFS-e.</p>
+            )}
+            <Formulario acao={enviarLogo} className="grade" botao={<button type="submit">{e.logo_path ? "Trocar logo" : "Enviar logo"}</button>}>
+              <input type="hidden" name="empresa_id" value={id} />
+              <label>Imagem (PNG ou JPG, até 500 KB)<input name="arquivo" type="file" accept="image/png,image/jpeg" required /><span className="suave">De preferência horizontal e com fundo transparente.</span></label>
+            </Formulario>
+            {e.logo_path && (
+              <Formulario acao={removerLogo} botao={<button type="submit" className="secundario">Tirar logo</button>}>
+                <input type="hidden" name="empresa_id" value={id} />
+              </Formulario>
+            )}
+          </div>
+        </>
+      )}
 
       <h2>Usuários da empresa</h2>
       <div className="tabela">

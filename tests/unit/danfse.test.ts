@@ -3,10 +3,18 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { tipoDaImagem } from "@/lib/empresa/logo";
 import { dataHora, gerarDanfse, moeda } from "@/lib/nfse/danfse";
 
 const xml = readFileSync(resolve(__dirname, "../fixtures/nfse-170.xml"), "utf8");
 const nomes: Record<string, string> = { "4301602": "Bagé / RS" };
+
+/** Imagens do PDF (pdfimages -list): uma linha por imagem desenhada. */
+function imagensDoPdf(pdf: Buffer): string[] {
+  const arq = join(mkdtempSync(join(tmpdir(), "danfse-")), "d.pdf");
+  writeFileSync(arq, pdf);
+  return execFileSync("pdfimages", ["-list", arq]).toString().split("\n").slice(2).filter((l) => l.trim() && !/ smask /.test(l));
+}
 
 function textoDoPdf(pdf: Buffer): string {
   const arq = join(mkdtempSync(join(tmpdir(), "danfse-")), "d.pdf");
@@ -33,6 +41,32 @@ describe("DANFSe gerado no sistema (NT 008)", () => {
     const normal = await gerarDanfse(xml);
     const cancelada = await gerarDanfse(xml, { situacao: "cancelada" });
     expect(cancelada.length).toBeGreaterThan(normal.length);
+  });
+  it("traz a logomarca colorida da NFS-e no cabeçalho", async () => {
+    const img = imagensDoPdf(await gerarDanfse(xml));
+    expect(img).toHaveLength(1);
+    expect(img[0]).toMatch(/720\s+146\s+(rgb|index)/);
+  });
+  it("empresa com logo (PNG ou JPG): sai a dela ao lado da logomarca da NFS-e", async () => {
+    for (const nome of ["logo-empresa.png", "logo-empresa.jpg"]) {
+      const logo = readFileSync(resolve(__dirname, `../fixtures/${nome}`));
+      expect(imagensDoPdf(await gerarDanfse(xml, { logoEmpresa: logo }))).toHaveLength(2);
+    }
+  });
+  it("logo no lugar: sai só a logo da empresa", async () => {
+    const logo = readFileSync(resolve(__dirname, "../fixtures/logo-empresa.png"));
+    const img = imagensDoPdf(await gerarDanfse(xml, { logoEmpresa: logo, posicaoLogo: "no_lugar" }));
+    expect(img).toHaveLength(1);
+    expect(img[0]).toMatch(/150\s+60\s/);
+  });
+  it("logo que não é imagem não derruba o PDF: sai a da NFS-e", async () => {
+    const img = imagensDoPdf(await gerarDanfse(xml, { logoEmpresa: Buffer.from("não é imagem") }));
+    expect(img).toHaveLength(1);
+  });
+  it("reconhece PNG e JPG pela assinatura do arquivo", () => {
+    expect(tipoDaImagem(readFileSync(resolve(__dirname, "../fixtures/logo-empresa.png")))).toBe("png");
+    expect(tipoDaImagem(readFileSync(resolve(__dirname, "../fixtures/logo-empresa.jpg")))).toBe("jpg");
+    expect(tipoDaImagem(Buffer.from("GIF89a"))).toBeNull();
   });
   it("formata moeda e data como na NT", () => {
     expect(moeda("1350.5")).toBe("R$ 1.350,50");
