@@ -14,6 +14,12 @@ export type DadosCnpj = {
   email?: string | null;
   ddd_telefone_1?: string | null;
   descricao_situacao_cadastral?: string | null;
+  cep?: string | null;
+  descricao_tipo_de_logradouro?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
 };
 
 export type EmpresaSugerida = {
@@ -38,6 +44,7 @@ type Fonte = { nome: string; url: (cnpj: string) => string; mapear: (j: unknown)
 function deCnpjWs(j: unknown): DadosCnpj {
   const d = j as { razao_social?: string; porte?: { descricao?: string }; simples?: { simples?: string; mei?: string } | null;
     estabelecimento?: { nome_fantasia?: string; situacao_cadastral?: string; email?: string; ddd1?: string; telefone1?: string;
+      cep?: string; tipo_logradouro?: string; logradouro?: string; numero?: string; complemento?: string; bairro?: string;
       cidade?: { ibge_id?: number; nome?: string }; estado?: { sigla?: string } } };
   const e = d.estabelecimento ?? {};
   return {
@@ -47,6 +54,8 @@ function deCnpjWs(j: unknown): DadosCnpj {
     opcao_pelo_simples: d.simples ? d.simples.simples === "Sim" : false, opcao_pelo_mei: d.simples ? d.simples.mei === "Sim" : false,
     email: e.email ?? null, ddd_telefone_1: `${e.ddd1 ?? ""}${e.telefone1 ?? ""}` || null,
     descricao_situacao_cadastral: e.situacao_cadastral ?? null,
+    cep: e.cep ?? null, descricao_tipo_de_logradouro: e.tipo_logradouro ?? null, logradouro: e.logradouro ?? null,
+    numero: e.numero ?? null, complemento: e.complemento ?? null, bairro: e.bairro ?? null,
   };
 }
 
@@ -57,11 +66,11 @@ const FONTES: Fonte[] = [
 ];
 
 /** Tenta as fontes públicas (todas espelham os dados abertos da Receita) até uma responder. */
-export async function consultarCnpj(cnpj: string, fetcher: typeof fetch = fetch): Promise<DadosCnpj> {
+export async function consultarCnpj(cnpj: string, fetcher: typeof fetch = fetch, limiteMs = 12_000): Promise<DadosCnpj> {
   const falhas: string[] = [];
   for (const f of FONTES) {
     try {
-      const r = await fetcher(f.url(cnpj), { signal: AbortSignal.timeout(12_000), headers: UA });
+      const r = await fetcher(f.url(cnpj), { signal: AbortSignal.timeout(limiteMs), headers: UA });
       if (r.status === 404) throw new Error(`CNPJ ${cnpj} não encontrado na base pública da Receita.`);
       if (!r.ok) { falhas.push(`${f.nome} HTTP ${r.status}`); continue; }
       return f.mapear(await r.json());
@@ -106,5 +115,49 @@ export function sugerirEmpresa(cnpj: string, titularCertificado: string, d: Dado
     email: d.email?.trim().toLowerCase() || null,
     telefone: tel || null,
     avisos,
+  };
+}
+
+/** Dados do CNPJ para preencher um cadastro (tomador ou empresa); o usuário confere e edita antes de gravar. */
+export type PreenchimentoCnpj = {
+  razao_social: string;
+  nome_fantasia: string;
+  email: string;
+  telefone: string;
+  cep: string;
+  cod_municipio: string;
+  logradouro: string;
+  numero: string;
+  complemento: string;
+  bairro: string;
+  regime: "ME" | "EPP" | "MEI" | "";
+  aviso: string | null;
+};
+
+const limpo = (v: unknown) => String(v ?? "").replace(/\s+/g, " ").trim();
+
+export function preenchimentoDoCnpj(d: DadosCnpj): PreenchimentoCnpj {
+  const tipo = limpo(d.descricao_tipo_de_logradouro);
+  const logr = limpo(d.logradouro);
+  // BrasilAPI separa o tipo ("RUA") do nome; junta quando o nome ainda não começa com ele
+  const logradouro = tipo && logr && !logr.toUpperCase().startsWith(tipo.toUpperCase() + " ") ? `${tipo} ${logr}` : logr;
+  const cod = limpo(d.codigo_municipio_ibge).replace(/\D/g, "");
+  const cep = limpo(d.cep).replace(/\D/g, "");
+  const numero = limpo(d.numero);
+  const porte = limpo(d.porte).toUpperCase();
+  const situacao = limpo(d.descricao_situacao_cadastral);
+  return {
+    razao_social: limpo(d.razao_social),
+    nome_fantasia: limpo(d.nome_fantasia),
+    email: limpo(d.email).toLowerCase(),
+    telefone: limpo(d.ddd_telefone_1).replace(/\D/g, ""),
+    cep: /^\d{8}$/.test(cep) ? cep : "",
+    cod_municipio: /^\d{7}$/.test(cod) ? cod : "",
+    logradouro,
+    numero: numero === "0" ? "S/N" : numero,
+    complemento: limpo(d.complemento),
+    bairro: limpo(d.bairro),
+    regime: d.opcao_pelo_mei ? "MEI" : porte.includes("MICRO") ? "ME" : porte.includes("PEQUENO") ? "EPP" : "",
+    aviso: situacao && situacao.toUpperCase() !== "ATIVA" ? `Atenção: na Receita este CNPJ está com situação ${situacao}.` : null,
   };
 }

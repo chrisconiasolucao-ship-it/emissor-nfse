@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EXEMPLO_RETENCAO, ROTULO_RETENCAO, TRIBUTOS_RETIDOS } from "@/lib/nfse/retencoes";
+import { CampoCnpj } from "@/components/campo-cnpj";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { CamposServico } from "@/components/campos-servico";
 import { EscolhaEmpresa } from "@/components/escolha-empresa";
@@ -150,7 +151,8 @@ export async function TelaCadastros({ aba, p }: { aba: "tomadores" | "servicos";
             <label>Tipo
               <select name="tipo_documento" defaultValue={s(e.tipo_documento) || "CPF"}><option value="CPF">CPF</option><option value="CNPJ">CNPJ</option></select>
             </label>
-            <label>CPF/CNPJ<input name="documento" defaultValue={s(e.documento)} required /></label>
+            <label>CPF/CNPJ<CampoCnpj name="documento" defaultValue={s(e.documento)} required tipo="tipo_documento" municipio="cod_municipio"
+              campos={{ razao_social: "nome", email: "email", telefone: "telefone", cep: "cep", cod_municipio: "cod_municipio", logradouro: "logradouro", numero: "numero", complemento: "complemento", bairro: "bairro" }} /></label>
             <label className="largo">Nome<input name="nome" defaultValue={s(e.nome)} required /></label>
             <label>E-mail<input name="email" type="email" defaultValue={s(e.email)} /></label>
             <label>Telefone<input name="telefone" defaultValue={s(e.telefone)} /></label>

@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { buscarMunicipios, type OpcaoMunicipio } from "@/app/(app)/municipios/actions";
 import { ComboBusca } from "@/components/combo-busca";
 
+/** Evento para outro campo (ex.: busca do CNPJ) definir o município pelo código IBGE: detail = código. */
+export const DEFINIR_MUNICIPIO = "municipio:definir";
+
 const rotulo = (m: OpcaoMunicipio) => `${m.nome}/${m.uf}`;
 const normal = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
 
@@ -17,6 +20,22 @@ export function CampoMunicipio({ name, codigo, required }: { name: string; codig
   const [cod, setCod] = useState(codigo ?? "");
   const [opcoes, setOpcoes] = useState<OpcaoMunicipio[]>([]);
   const ultimo = useRef(0);
+  const oculto = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = oculto.current;
+    if (!el) return;
+    const definir = (ev: Event) => {
+      const c = String((ev as CustomEvent<string>).detail ?? "");
+      if (!/^\d{7}$/.test(c)) return;
+      const n = ++ultimo.current;
+      setCod(c);
+      setTexto(c);
+      void buscarMunicipios(c).then((r) => { if (n === ultimo.current && r[0]) setTexto(rotulo(r[0])); });
+    };
+    el.addEventListener(DEFINIR_MUNICIPIO, definir);
+    return () => el.removeEventListener(DEFINIR_MUNICIPIO, definir);
+  }, []);
 
   // valor inicial: mostra o nome do código já gravado
   useEffect(() => {
@@ -47,7 +66,7 @@ export function CampoMunicipio({ name, codigo, required }: { name: string; codig
         opcoes={opcoes.map((m) => ({ valor: m.cod, rotulo: rotulo(m) }))}
         onDigitar={(v) => void digitar(v)}
         onEscolher={(o) => { ++ultimo.current; setTexto(o.rotulo); setCod(o.valor); }} />
-      <input type="hidden" name={name} value={cod} />
+      <input ref={oculto} type="hidden" name={name} value={cod} />
       {texto && !cod && <span className="suave">Escolha um município da lista.</span>}
     </>
   );

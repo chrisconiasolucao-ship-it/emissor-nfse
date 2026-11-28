@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { CampoCnpj } from "@/components/campo-cnpj";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { PassosNota, type Escolhido } from "@/components/passos-nota";
 import { CamposServico } from "@/components/campos-servico";
@@ -237,7 +238,8 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           <label>Tomador
             <select name="tomador_tipo" defaultValue={v.tomador_tipo ?? "CPF"}><option value="CPF">CPF</option><option value="CNPJ">CNPJ</option></select>
           </label>
-          <label>CPF/CNPJ<input name="tomador_documento" defaultValue={v.tomador_documento} required /></label>
+          <label>CPF/CNPJ<CampoCnpj name="tomador_documento" defaultValue={v.tomador_documento} required tipo="tomador_tipo" municipio="tomador_cod_municipio"
+            campos={{ razao_social: "tomador_nome", email: "tomador_email", cep: "tomador_cep", cod_municipio: "tomador_cod_municipio", logradouro: "tomador_logradouro", numero: "tomador_numero", complemento: "tomador_complemento", bairro: "tomador_bairro" }} /></label>
           <label className="largo">Nome do tomador<input name="tomador_nome" defaultValue={v.tomador_nome} required /></label>
           <label>E-mail<input name="tomador_email" type="email" defaultValue={v.tomador_email} /></label>
           <label>CEP<input name="tomador_cep" defaultValue={v.tomador_cep} /></label>
