@@ -2,6 +2,9 @@ import { Suspense } from "react";
 import { CampoCnpj } from "@/components/campo-cnpj";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { PassosNota, type Escolhido } from "@/components/passos-nota";
+import { CamposTomador } from "@/components/campos-tomador";
+import { Janela } from "@/components/janela";
+import Link from "next/link";
 import { CamposServico } from "@/components/campos-servico";
 import { Formulario } from "@/components/formulario";
 import { eEscritorio } from "@/lib/auth/permissoes";
@@ -15,6 +18,7 @@ import { codigoServico, documento } from "@/lib/formato";
 import { supabaseServidor } from "@/lib/supabase/server";
 import { calcularNota, EXEMPLO_RETENCAO, lerPercentual, percentuaisDaLinha, ROTULO_RETENCAO, TRIBUTOS_RETIDOS, type PercentuaisRetencao } from "@/lib/nfse/retencoes";
 import { salvarNota } from "../actions";
+import { salvarTomador } from "../../cadastros/actions";
 
 /** pct_ret_* do banco → campos ret_* do formulário ("11,00") */
 function retencoesTela(l: Record<string, unknown>): Valores {
@@ -126,10 +130,15 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
   let tomadorEsc: Escolhido = null;
   let servicoEsc: Escolhido = null;
   let servicoId: string | undefined;
+  // tomador novo: abre a janela de cadastro; ao gravar, volta para cá com ?tomador=<id>
+  let novoTomador: { tipo_documento: string; documento: string; nome: string } | null = null;
+  const semTomador = new URLSearchParams();
+  for (const [k, val] of Object.entries(busca)) if (val && !["tomador", "tdoc", "tnome"].includes(k)) semTomador.set(k, String(val));
+  if (p.empresa) semTomador.set("empresa", p.empresa);
+  const voltarNota = `/notas/nova?${semTomador.toString()}`;
   if (p.tomador === "novo" && p.empresa) {
     const doc = (p.tdoc ?? "").replace(/\D/g, "");
-    v = { ...v, empresa_id: p.empresa, tomador_tipo: doc.length === 14 ? "CNPJ" : "CPF", tomador_documento: doc, tomador_nome: p.tnome ?? "" };
-    tomadorEsc = { titulo: "Novo tomador", detalhe: "Preencha os dados abaixo. Ele fica salvo nos cadastros da empresa ao emitir.", novo: true };
+    novoTomador = { tipo_documento: doc.length === 14 ? "CNPJ" : "CPF", documento: doc, nome: p.tnome ?? "" };
   } else if (p.tomador && p.empresa) {
     const { data: t } = await db.from("tomador").select("*").eq("empresa_id", p.empresa).eq("id", p.tomador).maybeSingle();
     if (t) {
@@ -304,6 +313,16 @@ export default async function NovaNota({ searchParams }: { searchParams: Promise
           <div id="resumo-acoes" hidden={!pronto} />
         </aside>
       </div>
+      {novoTomador && p.empresa && (
+        <Janela titulo="Novo tomador" fechar={voltarNota}>
+          <Formulario acao={salvarTomador} className="grade"
+            botao={<><button type="submit">Cadastrar e voltar para a nota</button><Link className="botao secundario" href={voltarNota} replace scroll={false}>Cancelar</Link></>}>
+            <input type="hidden" name="empresa_id" value={p.empresa} />
+            <input type="hidden" name="voltar" value={voltarNota} />
+            <CamposTomador e={novoTomador} buscarAoAbrir />
+          </Formulario>
+        </Janela>
+      )}
     </>
   );
 }

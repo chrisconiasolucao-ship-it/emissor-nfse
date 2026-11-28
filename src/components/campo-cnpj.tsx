@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buscarDadosCnpj } from "@/app/(app)/cnpj/actions";
 import type { PreenchimentoCnpj } from "@/lib/empresa/consulta-cnpj";
 import { DEFINIR_MUNICIPIO } from "@/components/campo-municipio";
@@ -13,7 +13,7 @@ type Chave = Exclude<keyof PreenchimentoCnpj, "aviso">;
  * busca anterior), para não apagar o que o usuário digitou; o botão "Buscar de novo" substitui tudo. Se a consulta
  * falhar ou demorar, o cadastro segue à mão.
  */
-export function CampoCnpj({ name, defaultValue, required, campos, tipo, municipio }: {
+export function CampoCnpj({ name, defaultValue, required, campos, tipo, municipio, buscarAoAbrir }: {
   name: string;
   defaultValue?: string;
   required?: boolean;
@@ -22,6 +22,8 @@ export function CampoCnpj({ name, defaultValue, required, campos, tipo, municipi
   tipo?: string;
   /** name do campo escondido do município (CampoMunicipio) */
   municipio?: string;
+  /** já abre buscando, quando o CNPJ veio digitado de outra tela */
+  buscarAoAbrir?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const preenchido = useRef<Record<string, string>>({});
@@ -70,6 +72,12 @@ export function CampoCnpj({ name, defaultValue, required, campos, tipo, municipi
     if (num.length === 14 && num !== cnpj) { setCnpj(num); void buscar(num, false); }
     else if (num.length !== 14) { setCnpj(""); ++ultimo.current; setEstado(null); }
   }
+
+  useEffect(() => {
+    if (buscarAoAbrir && ref.current) digitar(ref.current.value);
+    // só ao abrir
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>

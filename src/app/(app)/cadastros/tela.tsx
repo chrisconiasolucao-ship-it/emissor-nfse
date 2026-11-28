@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { EXEMPLO_RETENCAO, ROTULO_RETENCAO, TRIBUTOS_RETIDOS } from "@/lib/nfse/retencoes";
-import { CampoCnpj } from "@/components/campo-cnpj";
 import { CampoMunicipio } from "@/components/campo-municipio";
 import { CamposServico } from "@/components/campos-servico";
+import { CamposTomador } from "@/components/campos-tomador";
 import { EscolhaEmpresa } from "@/components/escolha-empresa";
 import { Formulario } from "@/components/formulario";
 import { Janela } from "@/components/janela";
@@ -148,20 +148,7 @@ export async function TelaCadastros({ aba, p }: { aba: "tomadores" | "servicos";
             botao={<><button type="submit">{edicao ? "Salvar" : "Cadastrar tomador"}</button><Link className="botao secundario" href={fechar} replace scroll={false}>Cancelar</Link></>}>
             <input type="hidden" name="empresa_id" value={empresaId} />
             {edicao && <input type="hidden" name="id" value={s(e.id)} />}
-            <label>Tipo
-              <select name="tipo_documento" defaultValue={s(e.tipo_documento) || "CPF"}><option value="CPF">CPF</option><option value="CNPJ">CNPJ</option></select>
-            </label>
-            <label>CPF/CNPJ<CampoCnpj name="documento" defaultValue={s(e.documento)} required tipo="tipo_documento" municipio="cod_municipio"
-              campos={{ razao_social: "nome", email: "email", telefone: "telefone", cep: "cep", cod_municipio: "cod_municipio", logradouro: "logradouro", numero: "numero", complemento: "complemento", bairro: "bairro" }} /></label>
-            <label className="largo">Nome<input name="nome" defaultValue={s(e.nome)} required /></label>
-            <label>E-mail<input name="email" type="email" defaultValue={s(e.email)} /></label>
-            <label>Telefone<input name="telefone" defaultValue={s(e.telefone)} /></label>
-            <label>CEP<input name="cep" defaultValue={s(e.cep)} /></label>
-            <label>Município<CampoMunicipio name="cod_municipio" codigo={s(e.cod_municipio)} /></label>
-            <label className="largo">Logradouro<input name="logradouro" defaultValue={s(e.logradouro)} /></label>
-            <label>Número<input name="numero" defaultValue={s(e.numero)} /></label>
-            <label>Complemento<input name="complemento" defaultValue={s(e.complemento)} /></label>
-            <label>Bairro<input name="bairro" defaultValue={s(e.bairro)} /></label>
+            <CamposTomador e={e} />
           </Formulario>
           {edicao && (
             <div className="janela-pe">
