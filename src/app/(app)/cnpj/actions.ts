@@ -1,7 +1,7 @@
 "use server";
 
 import { perfilAtual } from "@/lib/auth/sessao";
-import { consultarCnpj, preenchimentoDoCnpj, type PreenchimentoCnpj } from "@/lib/empresa/consulta-cnpj";
+import { completarEndereco, consultarCnpj, preenchimentoDoCnpj, type PreenchimentoCnpj } from "@/lib/empresa/consulta-cnpj";
 import { cnpjValido } from "@/lib/importacao/planilha";
 
 /**
@@ -13,7 +13,7 @@ export async function buscarDadosCnpj(cnpj: string): Promise<{ erro: string } | 
   const c = String(cnpj ?? "").replace(/\D/g, "");
   if (!cnpjValido(c)) return { erro: "CNPJ inválido." };
   try {
-    return { dados: preenchimentoDoCnpj(await consultarCnpj(c, fetch, 6_000)) };
+    return { dados: await completarEndereco(c, preenchimentoDoCnpj(await consultarCnpj(c, fetch, 6_000))) };
   } catch (e) {
     return { erro: e instanceof Error ? e.message : "A consulta do CNPJ não respondeu. Preencha à mão." };
   }

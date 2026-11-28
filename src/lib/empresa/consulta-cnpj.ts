@@ -161,3 +161,39 @@ export function preenchimentoDoCnpj(d: DadosCnpj): PreenchimentoCnpj {
     aviso: situacao && situacao.toUpperCase() !== "ATIVA" ? `Atenção: na Receita este CNPJ está com situação ${situacao}.` : null,
   };
 }
+
+type EnderecoCep = { logradouro?: string; street?: string; bairro?: string; neighborhood?: string; erro?: boolean | string };
+
+/**
+ * Completa rua, número e complemento quando a primeira base veio sem eles: tenta as outras bases do CNPJ e,
+ * se nenhuma tiver, busca a rua pelo CEP (só CEP de rua; CEP geral de cidade termina em 000 e não diz a rua).
+ * Se nada trouxer, avisa que é para preencher à mão. Nunca lança erro: no pior caso devolve o que já tinha.
+ */
+export async function completarEndereco(cnpj: string, p: PreenchimentoCnpj, fetcher: typeof fetch = fetch, limiteMs = 5_000): Promise<PreenchimentoCnpj> {
+  if (p.logradouro) return p;
+  for (const f of FONTES.slice(1)) {
+    try {
+      const r = await fetcher(f.url(cnpj), { signal: AbortSignal.timeout(limiteMs), headers: UA });
+      if (!r.ok) continue;
+      const outro = preenchimentoDoCnpj(f.mapear(await r.json()));
+      if (outro.logradouro) {
+        return { ...p, logradouro: outro.logradouro, numero: p.numero || outro.numero, complemento: p.complemento || outro.complemento,
+          bairro: p.bairro || outro.bairro, cep: p.cep || outro.cep };
+      }
+    } catch { /* próxima base */ }
+  }
+  if (p.cep && !p.cep.endsWith("000")) {
+    for (const url of [`https://brasilapi.com.br/api/cep/v2/${p.cep}`, `https://viacep.com.br/ws/${p.cep}/json/`]) {
+      try {
+        const r = await fetcher(url, { signal: AbortSignal.timeout(limiteMs), headers: UA });
+        if (!r.ok) continue;
+        const c = (await r.json()) as EnderecoCep;
+        const rua = limpo(c.logradouro ?? c.street);
+        if (c.erro || !rua) continue;
+        return { ...p, logradouro: rua, bairro: p.bairro || limpo(c.bairro ?? c.neighborhood),
+          aviso: [p.aviso, "A rua veio pelo CEP; a Receita não informa rua e número deste CNPJ. Preencha o número."].filter(Boolean).join(" ") };
+      } catch { /* próxima */ }
+    }
+  }
+  return { ...p, aviso: [p.aviso, "A Receita não informa rua e número deste CNPJ (comum em MEI). Preencha à mão."].filter(Boolean).join(" ") };
+}

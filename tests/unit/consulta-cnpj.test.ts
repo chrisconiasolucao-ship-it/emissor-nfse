@@ -84,3 +84,30 @@ describe("preenchimento do cadastro pelo CNPJ", () => {
     expect(preenchimentoDoCnpj(await consultarCnpj("11222333000181", f))).toMatchObject({ logradouro: "Rua Sete", numero: "5", bairro: "Centro", cod_municipio: "4301602" });
   });
 });
+
+describe("completar o endereço que a Receita não trouxe", () => {
+  const base = { razao_social: "MEI", nome_fantasia: "", email: "", telefone: "", cep: "", cod_municipio: "4302808", logradouro: "",
+    numero: "", complemento: "", bairro: "CENTRO", regime: "MEI" as const, aviso: null };
+  it("CEP geral da cidade (termina em 000): não consulta o CEP e avisa para preencher à mão", async () => {
+    const { completarEndereco } = await import("@/lib/empresa/consulta-cnpj");
+    const urls: string[] = [];
+    const f = (async (u: string) => { urls.push(u); return new Response("{}", { status: 200 }); }) as unknown as typeof fetch;
+    const p = await completarEndereco("24484359000140", { ...base, cep: "96570000" }, f);
+    expect(urls.some((u) => u.includes("cep"))).toBe(false);
+    expect(p.logradouro).toBe("");
+    expect(p.aviso).toMatch(/Preencha à mão/);
+  });
+  it("CEP de rua: busca a rua pelo CEP", async () => {
+    const { completarEndereco } = await import("@/lib/empresa/consulta-cnpj");
+    const f = (async (u: string) => new Response(JSON.stringify(u.includes("/cep/") ? { street: "Rua Sete de Setembro", neighborhood: "Centro" } : {}), { status: 200 })) as unknown as typeof fetch;
+    const p = await completarEndereco("24484359000140", { ...base, cep: "96400100", bairro: "" }, f);
+    expect(p).toMatchObject({ logradouro: "Rua Sete de Setembro", bairro: "Centro" });
+    expect(p.aviso).toMatch(/pelo CEP/);
+  });
+  it("outra base do CNPJ com a rua: usa ela", async () => {
+    const { completarEndereco } = await import("@/lib/empresa/consulta-cnpj");
+    const f = (async (u: string) => new Response(JSON.stringify(u.includes("minhareceita") ? { logradouro: "RUA A", numero: "10" } : {}), { status: 200 })) as unknown as typeof fetch;
+    const p = await completarEndereco("24484359000140", { ...base, cep: "96570000" }, f);
+    expect(p).toMatchObject({ logradouro: "RUA A", numero: "10", aviso: null });
+  });
+});
