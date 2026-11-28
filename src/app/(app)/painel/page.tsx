@@ -8,6 +8,7 @@ import { empresaAtual } from "@/lib/empresa-atual";
 import { codigoServico, documento } from "@/lib/formato";
 import { competenciaAtual } from "@/lib/importacao/repetir-mes";
 import { reais, somar } from "@/lib/money";
+import { semDuplicadas } from "@/lib/notas/importadas";
 import { supabaseServidor } from "@/lib/supabase/server";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -33,13 +34,16 @@ export default async function Painel() {
   const atual = competenciaAtual();
   const meses = seisMeses(atual);
   const db = await supabaseServidor();
-  const [{ data: notas }, { data: ultimas }, { count: tomadores }, { count: servicos }, { data: cert }, { data: topServicos }] = await Promise.all([
+  const [{ data: notas }, { data: ultimas }, { count: tomadores }, { count: servicos }, { data: cert }, { data: topServicos }, { data: importadas }, { data: numeros }] = await Promise.all([
     db.from("nota").select("situacao, valor_servico, competencia").eq("empresa_id", id).gte("competencia", meses[0]!).limit(10000),
     db.from("nota").select("id, situacao, valor_servico, competencia, numero_nfse, motivo_rejeicao, tomador:tomador(nome)").eq("empresa_id", id).order("criado_em", { ascending: false }).limit(8),
     db.from("tomador").select("id", { count: "exact", head: true }).eq("empresa_id", id),
     db.from("servico").select("id", { count: "exact", head: true }).eq("empresa_id", id).eq("ativo", true),
     db.from("certificado").select("titular, valido_ate").eq("empresa_id", id).eq("ativo", true).maybeSingle(),
     db.from("servico").select("id, nome, descricao, codigo_tributacao_nacional").eq("empresa_id", id).eq("ativo", true).order("atualizado_em", { ascending: false }).limit(4),
+    // prestadas importadas (ADN ou XML) também são faturamento da empresa
+    db.from("documento").select("empresa_id, numero_nfse, competencia, valor").eq("empresa_id", id).eq("tipo", "xml_origem").eq("papel", "prestada").gte("competencia", meses[0]!).limit(10000),
+    db.from("nota").select("empresa_id, numero_nfse").eq("empresa_id", id).not("numero_nfse", "is", null).limit(10000),
   ]);
 
   const porMes = new Map<string, string[]>();
@@ -52,6 +56,12 @@ export default async function Painel() {
     if (n.situacao === "autorizada") { t.autorizada++; if (n.valor_servico != null) t.valor.push(String(n.valor_servico)); }
     else if (n.situacao === "na_fila" || n.situacao === "enviando") t.fila++;
     else if (n.situacao === "rejeitada") t.rejeitada++;
+  }
+  let importadasMes = 0;
+  for (const d of semDuplicadas(importadas ?? [], numeros ?? [])) {
+    if (d.valor == null || !d.competencia) continue;
+    porMes.set(d.competencia, [...(porMes.get(d.competencia) ?? []), String(d.valor)]);
+    if (d.competencia === atual) { importadasMes++; t.valor.push(String(d.valor)); }
   }
   const qtd = t.autorizada + t.fila + t.rejeitada;
   const pct = (v: number) => (qtd ? `${(v / qtd) * 100}%` : "0%");
@@ -85,7 +95,7 @@ export default async function Painel() {
         <div className="indicador destaque">
           <span className="rot">Faturado no mês</span>
           <span className="val">{reais(t.valor.length ? somar(...t.valor) : 0)}</span>
-          <span className="sub">{t.autorizada} {t.autorizada === 1 ? "nota autorizada" : "notas autorizadas"}</span>
+          <span className="sub">{t.autorizada} {t.autorizada === 1 ? "nota autorizada" : "notas autorizadas"}{importadasMes > 0 ? ` + ${importadasMes} ${importadasMes === 1 ? "importada" : "importadas"}` : ""}</span>
           <div className="composicao" aria-label="Notas do mês por situação">
             <span style={{ width: pct(t.autorizada), background: "#22a565" }} />
             <span style={{ width: pct(t.fila), background: "#e0951e" }} />
@@ -95,10 +105,10 @@ export default async function Painel() {
         <Link className="indicador" href={`/notas?situacao=autorizada&competencia=${comp}`}>
           <span className="rot">Autorizadas</span><span className="val">{t.autorizada}</span><span className="sub">neste mês</span>
         </Link>
-        <Link className="indicador fila" href="/notas?situacao=na_fila">
+        <Link className="indicador fila" href="/notas?situacao=na_fila&de=&ate=">
           <span className="rot">Na fila ou enviando</span><span className="val">{t.fila}</span><span className="sub">a Receita responde em minutos</span>
         </Link>
-        <Link className="indicador erro" href="/notas?situacao=rejeitada">
+        <Link className="indicador erro" href="/notas?situacao=rejeitada&de=&ate=">
           <span className="rot">Rejeitadas</span><span className="val">{t.rejeitada}</span><span className="sub">{t.rejeitada ? "precisam de correção" : "nenhuma pendente"}</span>
         </Link>
       </div>
