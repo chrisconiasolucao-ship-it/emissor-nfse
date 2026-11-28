@@ -9,6 +9,35 @@ const csvInts = (padrao: string) =>
 
 const inteiro = (padrao: number) => z.coerce.number().int().positive().default(padrao);
 
+/** Valor colado na Vercel com espaço, quebra de linha ou aspas: limpa; vazio conta como não cadastrado. */
+function limpar(v: unknown): unknown {
+  if (typeof v !== "string") return v;
+  const s = v.trim().replace(/^(["'])(.*)\1$/s, "$2").trim();
+  return s === "" ? undefined : s;
+}
+
+/** Texto opcional (chaves, usuário, senha): limpo; vazio = não cadastrado. */
+const textoOpc = () => z.preprocess(limpar, z.string().optional());
+
+/**
+ * Configuração opcional (e-mail, Resend, segredo do link): se vier errada, fica desligada e avisa no log,
+ * em vez de derrubar o sistema inteiro (28/11/2026: um EMAIL_REMETENTE recusado parou o Importar e a fila).
+ */
+function opcional<T extends z.ZodType>(nome: string, tipo: T) {
+  return z.preprocess(limpar, tipo.optional()).catch((ctx) => {
+    console.error(`Configuração: ${nome} inválida e ignorada (${ctx.error.issues.map((i) => i.message).join("; ")}). Corrija na Vercel e faça Redeploy.`);
+    return undefined;
+  });
+}
+
+/** Remetente: aceita "notas@dominio" ou "Nome <notas@dominio>" (fica só o endereço; o nome vem da empresa). */
+function soEndereco(v: unknown): unknown {
+  const s = limpar(v);
+  if (typeof s !== "string") return s;
+  const m = s.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/);
+  return m ? m[1] : s;
+}
+
 const servidorSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
@@ -28,22 +57,22 @@ const servidorSchema = z.object({
   PLANILHA_MAX_LINHAS: inteiro(30),
   CERT_ALERTA_DIAS: csvInts("30,15"),
   MUNICIPIOS_ALERTA_DIAS: inteiro(30),
-  BLOB_READ_WRITE_TOKEN: z.string().optional(),
-  BLOB_STORE_ID: z.string().optional(),
+  BLOB_READ_WRITE_TOKEN: textoOpc(),
+  BLOB_STORE_ID: textoOpc(),
   // Envio da nota ao tomador por e-mail: Gmail do escritório (SMTP com senha de app do Google).
   // Sem SMTP_USUARIO/SMTP_SENHA o botão de e-mail avisa que falta configurar.
   SMTP_HOST: z.string().default("smtp.gmail.com"),
   SMTP_PORTA: inteiro(465),
-  SMTP_USUARIO: z.string().optional(),
-  SMTP_SENHA: z.string().optional(),
+  SMTP_USUARIO: textoOpc(),
+  SMTP_SENHA: textoOpc(),
   // Domínio próprio: com RESEND_API_KEY e EMAIL_REMETENTE (ex.: notas@dominio.com.br) o e-mail sai pelo Resend;
   // sem os dois, continua pelo Gmail (SMTP).
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_REMETENTE: z.email().optional(),
+  RESEND_API_KEY: textoOpc(),
+  EMAIL_REMETENTE: opcional("EMAIL_REMETENTE", z.preprocess(soEndereco, z.email())),
   // Resposta quando a empresa não tem e-mail no cadastro; vazio usa o SMTP_USUARIO.
-  EMAIL_ESCRITORIO: z.string().optional(),
+  EMAIL_ESCRITORIO: textoOpc(),
   // Assina o link temporário do WhatsApp; sem ele usa o WORKER_SECRET.
-  ENVIO_LINK_SECRET: z.string().min(32).optional(),
+  ENVIO_LINK_SECRET: opcional("ENVIO_LINK_SECRET", z.string().min(32)),
   // IBS/CBS do Simples na DPS (NT 009): desligado até a Receita liberar; "grupo" manda só o grupo IBSCBS
   // (esquema atual), "completo" manda também regApIBSCBSSN e cAtvSN (Release 4).
   NFSE_IBSCBS_SIMPLES: z.enum(["desligado", "grupo", "completo"]).default("desligado"),
