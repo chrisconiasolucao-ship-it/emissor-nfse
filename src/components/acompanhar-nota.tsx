@@ -8,7 +8,7 @@ const LIMITE_MS = 5 * 60 * 1000;
 
 /**
  * Enquanto a nota está na fila ou enviando, mostra o "carregando" e atualiza a tela sozinha a cada 4 s, até a
- * Receita responder (autorizada ou rejeitada) ou passar de 5 minutos. A fila roda a cada minuto (pg_cron).
+ * Receita responder (autorizada ou rejeitada) ou passar de 5 minutos. A emissão começa logo após o clique; o pg_cron (a cada minuto) é a rede de segurança.
  */
 export function AcompanharNota({ texto }: { texto: string }) {
   const router = useRouter();

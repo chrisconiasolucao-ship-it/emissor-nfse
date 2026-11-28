@@ -16,6 +16,7 @@ import { dinheiro, lerValor } from "@/lib/money";
 import { type CodigoCancelamento } from "@/lib/nfse/evento-builder";
 import { aprenderDaNfse, guardarServico } from "@/lib/cadastros/aprender";
 import { cancelarNaReceita } from "@/lib/fila/cancelamento";
+import { dispararFila } from "@/lib/fila/disparar";
 import { camposFiscaisNota, lerPercentual, TRIBUTOS_RETIDOS, type PercentuaisRetencao } from "@/lib/nfse/retencoes";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { supabaseServidor } from "@/lib/supabase/server";
@@ -219,6 +220,7 @@ async function enfileirar(db: Db, perfil: Awaited<ReturnType<typeof perfilAtual>
   const { error } = await db.from("nota").update({ situacao: "na_fila", duplicidade_confirmada: iguais.length > 0 }).eq("empresa_id", empresaId).eq("id", id);
   if (error) return { erro: error.message };
   await avisarSeCliente(perfil, empresaId, id, `Nota enviada para emissão por ${perfil.email ?? "cliente"}: R$ ${n.valor_servico}.`);
+  await dispararFila();
   return null;
 }
 
@@ -337,6 +339,7 @@ export async function importarPlanilha(_: Estado, form: FormData): Promise<Estad
     if (criadas === 1) await avisarSeCliente(perfil, empresaId, String(n.id), `Planilha ${arquivo.name} importada por ${perfil.email ?? "cliente"}: ${lida.linhas.length} nota(s).`);
   }
   await admin.from("importacao").update({ notas_criadas: criadas }).eq("empresa_id", empresaId).eq("id", imp.data.id);
+  if (criadas > 0) await dispararFila();
   revalidatePath("/notas");
   return { ok: true, mensagem: `${criadas} nota(s) foram para a fila de emissão.` };
 }
